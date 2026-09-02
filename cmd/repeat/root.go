@@ -60,6 +60,7 @@ machine-readable output on stdout. Errors and warnings go to stderr.`,
 	root.AddCommand(
 		newAddCmd(),
 		newListCmd(),
+		newPruneCmd(),
 		newEnableCmd(),
 		newDisableCmd(),
 		newRemoveCmd(),
