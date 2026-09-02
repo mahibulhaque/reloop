@@ -1,0 +1,13 @@
+/bin/
+*.test
+*.out
+.DS_Store
+.idea/
+.vscode/
+
+# Local editor / agent scratch dir.
+.claude/
+CLAUDE.md
+
+# goreleaser dist output.
+/dist/

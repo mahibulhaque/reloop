@@ -1,0 +1,87 @@
+version: 2
+
+project_name: repeat
+
+builds:
+  - id: repeat
+    main: ./cmd/repeat
+    binary: repeat
+    env:
+      - CGO_ENABLED=0
+    flags:
+      - -trimpath
+    ldflags:
+      - -s -w -X main.version={{ .Version }} -X main.commit={{ .Commit }}
+    goos: [linux, darwin]
+    goarch: [amd64, arm64]
+    ignore:
+      # macOS Intel users can install via `go install`; we don't ship a
+      # darwin-amd64 binary.
+      - goos: darwin
+        goarch: amd64
+
+archives:
+  - id: default
+    formats: [tar.gz]
+    name_template: "{{ .ProjectName }}-v{{ .Version }}-{{ .Os }}-{{ .Arch }}"
+
+checksum:
+  name_template: "sha256sums.txt"
+
+snapshot:
+  version_template: "{{ incpatch .Version }}-next"
+
+changelog:
+  sort: asc
+  use: github
+  groups:
+    - title: Features
+      regexp: '^.*?feat(\([[:word:]]+\))??!?:.+$'
+      order: 0
+    - title: Fixes
+      regexp: '^.*?fix(\([[:word:]]+\))??!?:.+$'
+      order: 1
+    - title: Performance
+      regexp: '^.*?perf(\([[:word:]]+\))??!?:.+$'
+      order: 2
+    - title: Refactors
+      regexp: '^.*?refactor(\([[:word:]]+\))??!?:.+$'
+      order: 3
+    - title: Other
+      order: 999
+  filters:
+    exclude:
+      - "^chore:"
+      - "^docs:"
+      - "^test:"
+      - "^ci:"
+
+release:
+  draft: false
+  prerelease: auto
+  mode: replace
+
+# Auto-update Casks/repeat.rb in this same repo after each release.
+# Requires `contents: write` on GITHUB_TOKEN; the release workflow
+# already grants it. Casks replaced the deprecated `brews` formulas;
+# goreleaser check fails the CI on the old key.
+homebrew_casks:
+  - repository:
+      owner: mahibulhaque
+      name: repeat
+      branch: main
+    directory: Casks
+    homepage: https://github.com/mahibulhaque/repeat
+    description: Cron and one-shot job scheduler that runs in-process
+    commit_author:
+      name: mahibulhaque
+      email: mahibulhaque2000@gmail.com
+    commit_msg_template: "chore(brew): bump cask to {{ .Tag }}"
+    # The binaries are not notarized; strip the quarantine attribute so
+    # Gatekeeper does not block the first run on macOS.
+    hooks:
+      post:
+        install: |
+          if system_command("/usr/bin/xattr", args: ["-h"]).exit_status == 0
+            system_command "/usr/bin/xattr", args: ["-dr", "com.apple.quarantine", "#{staged_path}/repeat"]
+          end
