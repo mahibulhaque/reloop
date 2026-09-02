@@ -60,6 +60,7 @@ machine-readable output on stdout. Errors and warnings go to stderr.`,
 	root.AddCommand(
 		newAddCmd(),
 		newStatusCmd(),
+		newDebugCmd(),
 	)
 	tagUsageErrors(root)
 	return root
