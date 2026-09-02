@@ -66,6 +66,7 @@ machine-readable output on stdout. Errors and warnings go to stderr.`,
 		newRemoveCmd(),
 		newDaemonCmd(),
 		newStatusCmd(),
+		newShowCmd(),
 		newDebugCmd(),
 	)
 	tagUsageErrors(root)
