@@ -58,6 +58,7 @@ machine-readable output on stdout. Errors and warnings go to stderr.`,
 		"suppress the daemon-down warning written to stderr")
 
 	root.AddCommand(
+		newAddCmd(),
 		newStatusCmd(),
 	)
 	tagUsageErrors(root)
