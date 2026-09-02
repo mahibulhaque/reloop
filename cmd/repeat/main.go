@@ -28,7 +28,7 @@ func main() { os.Exit(run()) }
 // daemon must exit 0 after draining, or Restart=on-failure would
 // respawn it after every `eon stop`.
 func run() int {
-	ctx, cancel := context.WithCancel(context.Background())
+	_, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
 	var interrupted atomic.Bool
@@ -49,13 +49,14 @@ func run() int {
 	// That keeps help and error text legible on dark and light themes.
 	// Fang's default colors can look dim on dark mode.
 
-	err := fang.Execute(ctx, newRoot(), fangOptions()...)
-	if interrupted.Load() {
-		return 130
-	}
-	if err != nil {
-		return exitCode(err)
-	}
+	// TODO: Uncomment the following code block after Cobra setup
+	// err := fang.Execute(ctx, newRoot(), fangOptions()...)
+	// if interrupted.Load() {
+	// 	return 130
+	// }
+	// if err != nil {
+	// 	return exitCode(err)
+	// }
 	return 0
 }
 

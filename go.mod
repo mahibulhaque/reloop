@@ -2,7 +2,10 @@ module github.com/mahibulhaque/repeat
 
 go 1.27.1
 
-require github.com/charmbracelet/fang v1.0.0
+require (
+	github.com/charmbracelet/fang v1.0.0
+	github.com/robfig/cron/v3 v3.0.1
+)
 
 require (
 	charm.land/lipgloss/v2 v2.0.0-beta.3.0.20251106193318-19329a3e8410 // indirect
