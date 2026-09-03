@@ -8,9 +8,9 @@ import (
 	"os"
 	"path/filepath"
 
-	"github.com/mahibulhaque/repeat/internal/daemon"
-	"github.com/mahibulhaque/repeat/internal/repeat"
-	"github.com/mahibulhaque/repeat/internal/store"
+	"github.com/mahibulhaque/reloop/internal/daemon"
+	"github.com/mahibulhaque/reloop/internal/reloop"
+	"github.com/mahibulhaque/reloop/internal/store"
 	"github.com/spf13/cobra"
 )
 
@@ -24,28 +24,28 @@ var globalFlags rootFlags
 
 func newRoot() *cobra.Command {
 	root := &cobra.Command{
-		Use:               "repeat",
+		Use:               "reloop",
 		CompletionOptions: cobra.CompletionOptions{HiddenDefaultCmd: true},
 		Short:             "Cron and one-shot job scheduler that runs in-process.",
-		Long: `repeat schedules cron-style recurring jobs and one-shot jobs at a wall-clock
+		Long: `reloop schedules cron-style recurring jobs and one-shot jobs at a wall-clock
 time and executes them inside its own daemon. It does not use the system
 cron or at daemons, so it behaves identically on macOS and Linux.
 
 State lives in a single SQLite file under the platform's data directory
-(~/Library/Application Support/repeat on macOS, $XDG_DATA_HOME/repeat on Linux).
+(~/Library/Application Support/reloop on macOS, $XDG_DATA_HOME/reloop on Linux).
 Captured output for the last 100 runs per job is retained for 100 days.
 
-Run 'repeat install' once to register the daemon as a launchd LaunchAgent
+Run 'reloop install' once to register the daemon as a launchd LaunchAgent
 or systemd --user unit. The supervisor then starts the daemon at login
-and restarts the daemon after a crash. 'repeat stop' stops the daemon
-until the next login or the next 'repeat install'.
+and restarts the daemon after a crash. 'reloop stop' stops the daemon
+until the next login or the next 'reloop install'.
 
 Exit codes: 0=ok 1=err 2=usage 3=not-found 4=conflict 5=precondition.
 Output: pass --json to ls, show, status, prune, or add for stable,
 machine-readable output on stdout. Errors and warnings go to stderr.`,
-		Example: `  repeat install
-  repeat add --cron '@hourly' --name backup -- ./bk.sh
-  repeat ls --json`,
+		Example: `  reloop install
+  reloop add --cron '@hourly' --name backup -- ./bk.sh
+  reloop ls --json`,
 		Args:          rootArgs,
 		RunE:          rootHelp,
 		SilenceUsage:  true,
@@ -174,7 +174,7 @@ func withService(cmd *cobra.Command, fn func(*service) error) error {
 
 // warnIfDaemonDown writes a single stderr line when no daemon is
 // running. The check is done against the OS-level flock at
-// $DATA/repeat.lock, so a crashed daemon is instantly visible because
+// $DATA/reloop.lock, so a crashed daemon is instantly visible because
 // the kernel released the lock.
 //
 // A dead daemon with a supervisor installed gets its own message.
@@ -189,10 +189,10 @@ func warnIfDaemonDown(s *service) {
 		return
 	}
 	if state.Supervised {
-		fmt.Fprintln(stderr, "warning: repeatd is not running even though a supervisor is installed. Run 'repeat install' to refresh it, or check repeat.log in the data dir.")
+		fmt.Fprintln(stderr, "warning: reloopd is not running even though a supervisor is installed. Run 'reloop install' to refresh it, or check reloop.log in the data dir.")
 		return
 	}
-	fmt.Fprintln(stderr, "warning: repeatd is not running. Jobs will not fire until you run 'repeat install', or start it directly with 'repeat daemon &' on systems without launchd/systemd.")
+	fmt.Fprintln(stderr, "warning: reloopd is not running. Jobs will not fire until you run 'reloop install', or start it directly with 'reloop daemon &' on systems without launchd/systemd.")
 }
 
 // exitCode maps a returned error to a stable shell exit code. Callers
@@ -203,14 +203,14 @@ func exitCode(err error) int {
 		return 0
 	case errors.Is(err, errUsage):
 		return 2
-	case errors.Is(err, repeat.ErrNotFound):
+	case errors.Is(err, reloop.ErrNotFound):
 		return 3
-	case errors.Is(err, repeat.ErrConflict), errors.Is(err, repeat.ErrDaemonUp):
+	case errors.Is(err, reloop.ErrConflict), errors.Is(err, reloop.ErrDaemonUp):
 		return 4
-	case errors.Is(err, repeat.ErrInvalidSpec),
-		errors.Is(err, repeat.ErrInvalidCron),
-		errors.Is(err, repeat.ErrInvalidTime),
-		errors.Is(err, repeat.ErrUnsupportedOS):
+	case errors.Is(err, reloop.ErrInvalidSpec),
+		errors.Is(err, reloop.ErrInvalidCron),
+		errors.Is(err, reloop.ErrInvalidTime),
+		errors.Is(err, reloop.ErrUnsupportedOS):
 		return 5
 	default:
 		return 1

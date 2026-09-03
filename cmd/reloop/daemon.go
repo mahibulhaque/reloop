@@ -7,10 +7,10 @@ import (
 	"os/signal"
 	"syscall"
 
-	"github.com/mahibulhaque/repeat/internal/daemon"
-	"github.com/mahibulhaque/repeat/internal/repeat"
-	"github.com/mahibulhaque/repeat/internal/scheduler"
-	"github.com/mahibulhaque/repeat/internal/store"
+	"github.com/mahibulhaque/reloop/internal/daemon"
+	"github.com/mahibulhaque/reloop/internal/reloop"
+	"github.com/mahibulhaque/reloop/internal/scheduler"
+	"github.com/mahibulhaque/reloop/internal/store"
 	"github.com/spf13/cobra"
 )
 
@@ -18,15 +18,15 @@ func newDaemonCmd() *cobra.Command {
 	return &cobra.Command{
 		Use:   "daemon",
 		Short: "Run the scheduler in the foreground until SIGTERM.",
-		Long: `Run the scheduler in the foreground. 'repeat install' registers this
+		Long: `Run the scheduler in the foreground. 'reloop install' registers this
 process with launchd or systemd. On systems without either (Alpine,
 WSL, containers), run the daemon in a loop. The loop restarts the
-daemon after a crash. 'repeat stop' ends the loop:
+daemon after a crash. 'reloop stop' ends the loop:
 
-  mkdir -p "$HOME/.local/share/repeat"
-  nohup sh -c 'until repeat daemon; do sleep 1; done' >> "$HOME/.local/share/repeat/repeat.log" 2>&1 &
+  mkdir -p "$HOME/.local/share/reloop"
+  nohup sh -c 'until reloop daemon; do sleep 1; done' >> "$HOME/.local/share/reloop/reloop.log" 2>&1 &
 
-The daemon holds a file lock on $DATA/repeat.lock. A second daemon on
+The daemon holds a file lock on $DATA/reloop.lock. A second daemon on
 the same data dir exits with code 4. The daemon sleeps until the
 next deadline in the database. A SIGHUP from the CLI wakes the
 daemon after every write. The daemon exits 0 on SIGTERM and the
@@ -58,9 +58,9 @@ the supervisor restarts it.`,
 			if release == nil {
 				pid, _, running, _ := daemon.ProbeRunLock(dir)
 				if running && pid > 0 {
-					return fmt.Errorf("%w: pid %d", repeat.ErrDaemonUp, pid)
+					return fmt.Errorf("%w: pid %d", reloop.ErrDaemonUp, pid)
 				}
-				return fmt.Errorf("%w: another process holds the startup lock", repeat.ErrDaemonUp)
+				return fmt.Errorf("%w: another process holds the startup lock", reloop.ErrDaemonUp)
 			}
 			defer release()
 
@@ -79,15 +79,15 @@ the supervisor restarts it.`,
 					case <-cmd.Context().Done():
 						return
 					case sig := <-hup:
-						logger.Info("repeatd signal received", "signal", sig.String())
+						logger.Info("reloopd signal received", "signal", sig.String())
 						s.Wake()
 					}
 				}
 			}()
 
-			logger.Info("repeatd started", "data_dir", dir, "pid", os.Getpid())
+			logger.Info("reloopd started", "data_dir", dir, "pid", os.Getpid())
 			s.Start(cmd.Context())
-			logger.Info("repeatd stopped")
+			logger.Info("reloopd stopped")
 			return nil
 		},
 	}

@@ -1,4 +1,4 @@
-package repeat
+package reloop
 
 import "errors"
 
@@ -9,23 +9,23 @@ import "errors"
 // Add new entries deliberately.
 var (
 	// ErrNotFound means a requested job or run does not exist.
-	ErrNotFound = errors.New("repeat: not found")
+	ErrNotFound = errors.New("reloop: not found")
 
 	// ErrConflict means an operation conflicts with current state.
-	ErrConflict = errors.New("repeat: conflict")
+	ErrConflict = errors.New("reloop: conflict")
 
 	// ErrDaemonUp means another daemon instance is already running.
-	ErrDaemonUp = errors.New("repeat: daemon already running")
+	ErrDaemonUp = errors.New("reloop: daemon already running")
 
 	// ErrInvalidCron means a cron expression is not accepted.
-	ErrInvalidCron = errors.New("repeat: invalid cron expression")
+	ErrInvalidCron = errors.New("reloop: invalid cron expression")
 
 	// ErrInvalidTime means a one-shot time expression is invalid.
-	ErrInvalidTime = errors.New("repeat: invalid time")
+	ErrInvalidTime = errors.New("reloop: invalid time")
 
 	// ErrInvalidSpec means a job spec failed validation.
-	ErrInvalidSpec = errors.New("repeat: invalid job spec")
+	ErrInvalidSpec = errors.New("reloop: invalid job spec")
 
 	// ErrUnsupportedOS means the requested supervisor operation is unavailable.
-	ErrUnsupportedOS = errors.New("repeat: unsupported OS")
+	ErrUnsupportedOS = errors.New("reloop: unsupported OS")
 )

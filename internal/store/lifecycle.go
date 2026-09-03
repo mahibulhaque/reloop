@@ -27,12 +27,12 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/mahibulhaque/repeat/internal/repeat"
+	"github.com/mahibulhaque/reloop/internal/reloop"
 )
 
 // interruptedNote is stored as the output of a run whose real
 // outcome is unknown because the daemon died.
-const interruptedNote = "repeat: daemon exited before this run finished, outcome unknown\n"
+const interruptedNote = "reloop: daemon exited before this run finished, outcome unknown\n"
 
 // Claim takes a due job and opens its running row.
 //
@@ -43,7 +43,7 @@ const interruptedNote = "repeat: daemon exited before this run finished, outcome
 //     skipped_overlap row instead and nothing runs.
 //  3. Otherwise insert the running row and return its ID with
 //     run=true.
-func (s *Store) Claim(ctx context.Context, id repeat.JobID, prev, next, now time.Time, maxRunning int) (runID int64, run bool, err error) {
+func (s *Store) Claim(ctx context.Context, id reloop.JobID, prev, next, now time.Time, maxRunning int) (runID int64, run bool, err error) {
 	err = retryOnBusy(ctx, func() error {
 		var cerr error
 		runID, run, cerr = s.claim(ctx, id, prev, next, now, maxRunning)
@@ -52,7 +52,7 @@ func (s *Store) Claim(ctx context.Context, id repeat.JobID, prev, next, now time
 	return runID, run, err
 }
 
-func (s *Store) claim(ctx context.Context, id repeat.JobID, prev, next, now time.Time, maxRunning int) (int64, bool, error) {
+func (s *Store) claim(ctx context.Context, id reloop.JobID, prev, next, now time.Time, maxRunning int) (int64, bool, error) {
 	// Zero rows here means the job changed since the due scan or
 	// every slot is busy.
 	const claimDeadlineSQL = `
@@ -97,7 +97,7 @@ func (s *Store) claim(ctx context.Context, id repeat.JobID, prev, next, now time
 	}
 	if overlapping {
 		if _, err := tx.ExecContext(ctx, recordOverlapSQL,
-			string(id), now.UnixMilli(), now.UnixMilli(), string(repeat.RunSkippedOverlap)); err != nil {
+			string(id), now.UnixMilli(), now.UnixMilli(), string(reloop.RunSkippedOverlap)); err != nil {
 			return 0, false, fmt.Errorf("claim record overlap: %w", err)
 		}
 		if err := tx.Commit(); err != nil {
@@ -107,7 +107,7 @@ func (s *Store) claim(ctx context.Context, id repeat.JobID, prev, next, now time
 	}
 
 	res, err = tx.ExecContext(ctx, openRunSQL,
-		string(id), now.UnixMilli(), string(repeat.RunRunning))
+		string(id), now.UnixMilli(), string(reloop.RunRunning))
 	if err != nil {
 		return 0, false, fmt.Errorf("claim record run: %w", err)
 	}
@@ -129,7 +129,7 @@ func (s *Store) claim(ctx context.Context, id repeat.JobID, prev, next, now time
 //     is marked done.
 //
 // ErrNotFound means the job was deleted mid-run.
-func (s *Store) Finish(ctx context.Context, runID int64, id repeat.JobID, exitCode int, outcome repeat.RunStatus, output []byte, now time.Time) error {
+func (s *Store) Finish(ctx context.Context, runID int64, id reloop.JobID, exitCode int, outcome reloop.RunStatus, output []byte, now time.Time) error {
 	if output == nil {
 		output = []byte{}
 	}
@@ -138,7 +138,7 @@ func (s *Store) Finish(ctx context.Context, runID int64, id repeat.JobID, exitCo
 	})
 }
 
-func (s *Store) finish(ctx context.Context, runID int64, id repeat.JobID, exitCode int, outcome repeat.RunStatus, output []byte, now time.Time) error {
+func (s *Store) finish(ctx context.Context, runID int64, id reloop.JobID, exitCode int, outcome reloop.RunStatus, output []byte, now time.Time) error {
 	// Zero rows here means the row is not running anymore.
 	const closeRunSQL = `
 		UPDATE runs SET finished_at = ?, exit_code = ?, status = ?, output = ?
@@ -168,7 +168,7 @@ func (s *Store) finish(ctx context.Context, runID int64, id repeat.JobID, exitCo
 		return fmt.Errorf("finish rows affected: %w", err)
 	}
 	if n == 0 {
-		return fmt.Errorf("%w: run %d of job %q is not running, the job was deleted mid-run", repeat.ErrNotFound, runID, id)
+		return fmt.Errorf("%w: run %d of job %q is not running, the job was deleted mid-run", reloop.ErrNotFound, runID, id)
 	}
 	if _, err := tx.ExecContext(ctx, finishJobSQL,
 		ms, string(outcome), ms, string(id)); err != nil {
@@ -214,11 +214,11 @@ func (s *Store) recoverInterrupted(ctx context.Context, now time.Time) (int, err
 
 	ms := now.UnixMilli()
 	if _, err := tx.ExecContext(ctx, recoverJobsSQL,
-		ms, string(repeat.RunInterrupted), ms); err != nil {
+		ms, string(reloop.RunInterrupted), ms); err != nil {
 		return 0, fmt.Errorf("recover jobs: %w", err)
 	}
 	res, err := tx.ExecContext(ctx, recoverRunsSQL,
-		string(repeat.RunInterrupted), ms, []byte(interruptedNote))
+		string(reloop.RunInterrupted), ms, []byte(interruptedNote))
 	if err != nil {
 		return 0, fmt.Errorf("recover runs: %w", err)
 	}

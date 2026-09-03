@@ -7,12 +7,12 @@ import (
 	"io"
 	"time"
 
-	"github.com/mahibulhaque/repeat/internal/repeat"
-	"github.com/mahibulhaque/repeat/internal/store"
+	"github.com/mahibulhaque/reloop/internal/reloop"
+	"github.com/mahibulhaque/reloop/internal/store"
 	"github.com/spf13/cobra"
 )
 
-// logOpts controls the streaming behaviour of `repeat logs`.
+// logOpts controls the streaming behaviour of `reloop logs`.
 type logOpts struct {
 	Follow bool          // when true, blocks waiting for new completed runs
 	Lines  int           // last N lines from each emitted run (0 = all)
@@ -55,11 +55,11 @@ Behaviour matrix:
   --since + --follow    runs in the window, then new ones as they appear.
 
 Header format: '==> run #ID status exit=N finished=TIME'.`,
-		Example: `  repeat logs backup
-  repeat logs backup -n 50
-  repeat logs 7K3px -f
-  repeat logs backup --since 1h
-  repeat logs backup --since 30m -f`,
+		Example: `  reloop logs backup
+  reloop logs backup -n 50
+  reloop logs 7K3px -f
+  reloop logs backup --since 1h
+  reloop logs backup --since 30m -f`,
 		Args: jobArg,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			if lines < 0 {
@@ -96,13 +96,13 @@ Header format: '==> run #ID status exit=N finished=TIME'.`,
 //  3. With --follow, keep polling by run ID and emit runs as they
 //     finish, until ctx is cancelled. The cursor never moves past an
 //     open running row, or its output would be lost when it closes.
-func streamLogs(ctx context.Context, st *store.Store, jobID repeat.JobID, opts logOpts, w io.Writer) error {
+func streamLogs(ctx context.Context, st *store.Store, jobID reloop.JobID, opts logOpts, w io.Writer) error {
 	started := time.Now()
 	if opts.Since == 0 && !opts.Follow {
 		// No flags: print the latest completed run raw. A job with no
 		// runs prints nothing and exits 0.
 		run, err := st.LatestRun(ctx, jobID)
-		if errors.Is(err, repeat.ErrNotFound) {
+		if errors.Is(err, reloop.ErrNotFound) {
 			return nil
 		}
 		if err != nil {
@@ -130,7 +130,7 @@ func streamLogs(ctx context.Context, st *store.Store, jobID repeat.JobID, opts l
 			if openID > 0 && r.ID > openID {
 				break
 			}
-			if r.Status == repeat.RunRunning {
+			if r.Status == reloop.RunRunning {
 				continue
 			}
 			if err := emitRunWithHeader(ctx, st, r, opts.Lines, w); err != nil {
@@ -196,7 +196,7 @@ func streamLogs(ctx context.Context, st *store.Store, jobID repeat.JobID, opts l
 			continue
 		}
 		for _, run := range runs {
-			if run.Status == repeat.RunRunning {
+			if run.Status == reloop.RunRunning {
 				// Still open: stop here rather than skip, so the
 				// cursor stays behind it until it closes.
 				break
@@ -215,7 +215,7 @@ func streamLogs(ctx context.Context, st *store.Store, jobID repeat.JobID, opts l
 	}
 }
 
-func emitRunWithHeader(ctx context.Context, st *store.Store, run repeat.Run, lines int, w io.Writer) error {
+func emitRunWithHeader(ctx context.Context, st *store.Store, run reloop.Run, lines int, w io.Writer) error {
 	header := fmt.Sprintf("==> run #%d %s exit=%d finished=%s\n",
 		run.ID, run.Status, run.ExitCode, fmtLocal(run.FinishedAt))
 	if _, err := io.WriteString(w, header); err != nil {

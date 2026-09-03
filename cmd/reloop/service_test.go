@@ -5,8 +5,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/mahibulhaque/repeat/internal/repeat"
-	"github.com/mahibulhaque/repeat/internal/store"
+	"github.com/mahibulhaque/reloop/internal/reloop"
+	"github.com/mahibulhaque/reloop/internal/store"
 )
 
 // newStore opens a throwaway store rooted in t.TempDir.
@@ -22,13 +22,13 @@ func newStore(t *testing.T) *store.Store {
 
 // markDone drives job through claim and finish, landing it done the
 // same way production does.
-func markDone(t *testing.T, st *store.Store, job repeat.Job) {
+func markDone(t *testing.T, st *store.Store, job reloop.Job) {
 	t.Helper()
 	runID, run, err := st.Claim(t.Context(), job.ID, job.NextFireAt, time.Time{}, time.Now(), 100)
 	if err != nil || !run {
 		t.Fatalf("Claim(%s) = (run=%v, %v), want a claimed run", job.ID, run, err)
 	}
-	if err := st.Finish(t.Context(), runID, job.ID, 0, repeat.RunOK, nil, time.Now()); err != nil {
+	if err := st.Finish(t.Context(), runID, job.ID, 0, reloop.RunOK, nil, time.Now()); err != nil {
 		t.Fatalf("Finish(%s): %v", job.ID, err)
 	}
 }
@@ -37,7 +37,7 @@ func TestServiceEnableCronSchedulesFromNow(t *testing.T) {
 	st := newStore(t)
 
 	createdAt := time.Now().Add(-3 * time.Hour).Truncate(time.Second)
-	job, err := st.AddJob(t.Context(), repeat.JobSpec{
+	job, err := st.AddJob(t.Context(), reloop.JobSpec{
 		Name: "stale", Command: []string{"true"}, Cron: "@hourly",
 	}, createdAt)
 	if err != nil {
@@ -71,7 +71,7 @@ func TestServiceEnableCronSchedulesFromNow(t *testing.T) {
 func TestServiceEnableEnabledCronIsNoOp(t *testing.T) {
 	st := newStore(t)
 
-	job, err := st.AddJob(t.Context(), repeat.JobSpec{
+	job, err := st.AddJob(t.Context(), reloop.JobSpec{
 		Name: "live", Command: []string{"true"}, Cron: "@hourly",
 	}, time.Now().Add(-30*time.Minute))
 	if err != nil {
@@ -98,7 +98,7 @@ func TestServiceEnableDoneOneshotConflicts(t *testing.T) {
 	st := newStore(t)
 
 	addedAt := time.Now().Add(-time.Hour)
-	job, err := st.AddJob(t.Context(), repeat.JobSpec{
+	job, err := st.AddJob(t.Context(), reloop.JobSpec{
 		Name: "ran", Command: []string{"true"}, FireAt: addedAt.Add(time.Minute),
 	}, addedAt)
 	if err != nil {
@@ -107,14 +107,14 @@ func TestServiceEnableDoneOneshotConflicts(t *testing.T) {
 	markDone(t, st, job)
 
 	err = newService(st).Enable(t.Context(), job)
-	if !errors.Is(err, repeat.ErrConflict) {
+	if !errors.Is(err, reloop.ErrConflict) {
 		t.Fatalf("Enable(done oneshot) = %v, want errors.Is(ErrConflict)", err)
 	}
 	got, err := st.Job(t.Context(), job.ID)
 	if err != nil {
 		t.Fatalf("Job: %v", err)
 	}
-	if got.Status != repeat.StatusDone || !got.NextFireAt.IsZero() {
+	if got.Status != reloop.StatusDone || !got.NextFireAt.IsZero() {
 		t.Errorf("after rejected enable: status=%s next=%s, want done/zero", got.Status, got.NextFireAt)
 	}
 }
@@ -126,7 +126,7 @@ func TestServiceEnableClaimedOneshotConflicts(t *testing.T) {
 	st := newStore(t)
 
 	now := time.Now()
-	job, err := st.AddJob(t.Context(), repeat.JobSpec{
+	job, err := st.AddJob(t.Context(), reloop.JobSpec{
 		Name: "claimed", Command: []string{"true"}, FireAt: now.Add(time.Hour),
 	}, now)
 	if err != nil {
@@ -140,7 +140,7 @@ func TestServiceEnableClaimedOneshotConflicts(t *testing.T) {
 	}
 
 	err = newService(st).Enable(t.Context(), job)
-	if !errors.Is(err, repeat.ErrConflict) {
+	if !errors.Is(err, reloop.ErrConflict) {
 		t.Fatalf("Enable(claimed oneshot) = %v, want errors.Is(ErrConflict)", err)
 	}
 	got, err := st.Job(t.Context(), job.ID)
@@ -159,7 +159,7 @@ func TestServiceDisableDoneOneshotConflicts(t *testing.T) {
 	st := newStore(t)
 
 	now := time.Now()
-	job, err := st.AddJob(t.Context(), repeat.JobSpec{
+	job, err := st.AddJob(t.Context(), reloop.JobSpec{
 		Name: "ran", Command: []string{"true"}, FireAt: now.Add(time.Minute),
 	}, now)
 	if err != nil {
@@ -168,7 +168,7 @@ func TestServiceDisableDoneOneshotConflicts(t *testing.T) {
 	markDone(t, st, job)
 
 	err = newService(st).Disable(t.Context(), job)
-	if !errors.Is(err, repeat.ErrConflict) {
+	if !errors.Is(err, reloop.ErrConflict) {
 		t.Fatalf("Disable(done oneshot) = %v, want errors.Is(ErrConflict)", err)
 	}
 	counts, err := st.Counts(t.Context())

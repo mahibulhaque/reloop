@@ -9,7 +9,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/mahibulhaque/repeat/internal/repeat"
+	"github.com/mahibulhaque/reloop/internal/reloop"
 	"github.com/spf13/cobra"
 )
 
@@ -39,8 +39,8 @@ One positional after '--' runs as a shell line through sh -c. Two or
 more positionals run directly as the program and its arguments. Use
 the shell form for pipes, redirects, or paths with spaces.
 
-Put every repeat flag (--cron, --at, --name, --json) BEFORE '--'. Anything
-after '--' belongs to the job and is not parsed by repeat.
+Put every reloop flag (--cron, --at, --name, --json) BEFORE '--'. Anything
+after '--' belongs to the job and is not parsed by reloop.
 
 Absolute-path binaries (e.g. /usr/bin/python3) are checked for existence
 at add time so a typo'd path doesn't silently produce a job that fails
@@ -84,8 +84,8 @@ A 5-field crontab expression or one of the @descriptor shortcuts.
     @every DURATION         fire every DURATION (Go-style: 30s, 5m, 2h, 24h)
 
   NOT supported:
-    @reboot      repeat's daemon does not see reboot events directly.
-                 Use 'repeat install' to register a launchd/systemd unit
+    @reboot      reloop's daemon does not see reboot events directly.
+                 Use 'reloop install' to register a launchd/systemd unit
                  that starts the daemon at boot, then schedule normally.
     seconds      the parser works per minute. Use @every 30s for
                  sub-minute intervals.
@@ -116,12 +116,12 @@ A wall-clock time in the future. All forms below are accepted.
 The time must be in the future. A past time is rejected with exit
 code 5. The latest accepted time is 9999-12-31T09:59:59Z, so the
 year has four digits in any timezone.`,
-		Example: `  repeat add --cron "@hourly" --name backup -- /usr/local/bin/backup.sh
-  repeat add --cron "0 9 * * 1-5" -- 'say "stand up"'
-  repeat add --cron "@every 30s" -- /bin/echo tick
-  repeat add --at "tomorrow 9am" --name morning -- 'say "good morning"'
-  repeat add --at "+30m" -- "echo reminder | mail me@example.com"
-  repeat add --at "2026-12-31T23:59:00-08:00" --name year-end -- ./fireworks`,
+		Example: `  reloop add --cron "@hourly" --name backup -- /usr/local/bin/backup.sh
+  reloop add --cron "0 9 * * 1-5" -- 'say "stand up"'
+  reloop add --cron "@every 30s" -- /bin/echo tick
+  reloop add --at "tomorrow 9am" --name morning -- 'say "good morning"'
+  reloop add --at "+30m" -- "echo reminder | mail me@example.com"
+  reloop add --at "2026-12-31T23:59:00-08:00" --name year-end -- ./fireworks`,
 		Args: cobra.MinimumNArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			// Validate all input before openService: a rejected
@@ -130,7 +130,7 @@ year has four digits in any timezone.`,
 				return usageErrf("provide exactly one of --cron or --at")
 			}
 			if cmd.ArgsLenAtDash() < 0 {
-				return usageErrf("place the command after '--', for example `repeat add --cron '@hourly' -- /bin/echo hi`")
+				return usageErrf("place the command after '--', for example `reloop add --cron '@hourly' -- /bin/echo hi`")
 			}
 			if strings.TrimSpace(args[0]) == "" {
 				return usageErrf("empty command after '--'")
@@ -139,11 +139,11 @@ year has four digits in any timezone.`,
 				return err
 			}
 
-			spec := repeat.JobSpec{Command: wrapCommand(args), Name: name}
+			spec := reloop.JobSpec{Command: wrapCommand(args), Name: name}
 			if spec.Name == "" {
 				// A derived name must fit the store's cap. Only an
 				// explicit --name is rejected for length.
-				spec.Name = truncate(strings.Join(args, " "), repeat.MaxNameRunes)
+				spec.Name = truncate(strings.Join(args, " "), reloop.MaxNameRunes)
 			}
 			// Snapshot the user's environment so the daemon's minimal
 			// launchd/systemd PATH doesn't break commands that "just
@@ -155,7 +155,7 @@ year has four digits in any timezone.`,
 			if cronExpression != "" {
 				spec.Cron = cronExpression
 			} else {
-				fireAt, err := repeat.ParseAt(atExpression, now)
+				fireAt, err := reloop.ParseAt(atExpression, now)
 				if err != nil {
 					return err
 				}

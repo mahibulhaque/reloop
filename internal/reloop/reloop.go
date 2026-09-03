@@ -1,4 +1,4 @@
-package repeat
+package reloop
 
 import "time"
 
@@ -67,7 +67,7 @@ type Job struct {
 	Kind    JobKind  `json:"kind"`
 	Name    string   `json:"name"`
 	Command []string `json:"command"`
-	// Env is captured at `repeat add` time.
+	// Env is captured at `reloop add` time.
 	//
 	// It is kept so daemon-run jobs see the user's PATH.
 	// It is omitted from JSON because envs often contain secrets.
@@ -122,7 +122,7 @@ type DaemonStatus struct {
 	Supervised bool      `json:"supervised"` // true when a supervisor unit is installed
 }
 
-// JobCounts is the per-kind/per-state aggregate used by `repeat status`.
+// JobCounts is the per-kind/per-state aggregate used by `reloop status`.
 // Every job lands in exactly one state bucket, so the buckets sum to
 // the kind totals.
 type JobCounts struct {
@@ -145,7 +145,7 @@ type JobCounts struct {
 	OneshotInFlight int `json:"oneshot_in_flight"`
 }
 
-// Status aggregates daemon + storage info for `repeat status`.
+// Status aggregates daemon + storage info for `reloop status`.
 type Status struct {
 	Daemon  DaemonStatus `json:"daemon"`
 	DataDir string       `json:"data_dir"`

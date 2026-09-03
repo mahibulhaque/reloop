@@ -6,9 +6,9 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/mahibulhaque/repeat/internal/daemon"
-	"github.com/mahibulhaque/repeat/internal/repeat"
-	"github.com/mahibulhaque/repeat/internal/store"
+	"github.com/mahibulhaque/reloop/internal/daemon"
+	"github.com/mahibulhaque/reloop/internal/reloop"
+	"github.com/mahibulhaque/reloop/internal/store"
 )
 
 // service is the CLI's composition root.
@@ -30,11 +30,11 @@ func (s *service) notify() {
 
 // Add inserts a job. now comes from the command so parsing --at and
 // validating it use the same clock reading.
-func (s *service) Add(ctx context.Context, spec repeat.JobSpec, now time.Time) (repeat.Job, error) {
+func (s *service) Add(ctx context.Context, spec reloop.JobSpec, now time.Time) (reloop.Job, error) {
 	// Validation happens inside AddJob so the store is the single gate.
 	job, err := s.st.AddJob(ctx, spec, now)
 	if err != nil {
-		return repeat.Job{}, err
+		return reloop.Job{}, err
 	}
 	s.notify()
 	return job, nil
@@ -52,9 +52,9 @@ var idShape = regexp.MustCompile(`^[0-9A-Za-z]{5}$`)
 //   - Anything else is treated as a name only.
 //
 // The returned Job carries the real ID for follow-on writes.
-func (s *service) Resolve(ctx context.Context, arg string) (repeat.Job, error) {
+func (s *service) Resolve(ctx context.Context, arg string) (reloop.Job, error) {
 	if idShape.MatchString(arg) {
-		job, err := s.st.Job(ctx, repeat.JobID(arg))
+		job, err := s.st.Job(ctx, reloop.JobID(arg))
 		if err == nil {
 			return job, nil
 		}
@@ -72,7 +72,7 @@ func (s *service) Resolve(ctx context.Context, arg string) (repeat.Job, error) {
 //
 // The bool result is true when more rows were available.
 // Front-ends use that to show a "more available" hint.
-func (s *service) List(ctx context.Context, opts store.ListOpts) ([]repeat.Job, bool, error) {
+func (s *service) List(ctx context.Context, opts store.ListOpts) ([]reloop.Job, bool, error) {
 	limit := opts.Limit
 	if limit == 0 {
 		limit = store.DefaultListLimit
@@ -95,7 +95,7 @@ func (s *service) List(ctx context.Context, opts store.ListOpts) ([]repeat.Job, 
 	return jobs, hasMore, nil
 }
 
-func (s *service) Delete(ctx context.Context, job repeat.Job) error {
+func (s *service) Delete(ctx context.Context, job reloop.Job) error {
 	if err := s.st.DeleteJob(ctx, job.ID); err != nil {
 		return err
 	}
@@ -106,16 +106,16 @@ func (s *service) Delete(ctx context.Context, job repeat.Job) error {
 // Enable re-activates a disabled job from now. Disabled intervals are
 // not backfilled. The store guards a done or already-claimed one-shot
 // inside the update itself.
-func (s *service) Enable(ctx context.Context, job repeat.Job) error {
+func (s *service) Enable(ctx context.Context, job reloop.Job) error {
 	now := time.Now()
-	if err := s.st.EnableJob(ctx, job.ID, repeat.NextFire(job, now), now); err != nil {
+	if err := s.st.EnableJob(ctx, job.ID, reloop.NextFire(job, now), now); err != nil {
 		return err
 	}
 	s.notify()
 	return nil
 }
 
-func (s *service) Disable(ctx context.Context, job repeat.Job) error {
+func (s *service) Disable(ctx context.Context, job reloop.Job) error {
 	if err := s.st.DisableJob(ctx, job.ID, time.Now()); err != nil {
 		return err
 	}
@@ -123,12 +123,12 @@ func (s *service) Disable(ctx context.Context, job repeat.Job) error {
 	return nil
 }
 
-func (s *service) Status(ctx context.Context) (repeat.Status, error) {
+func (s *service) Status(ctx context.Context) (reloop.Status, error) {
 	counts, err := s.st.Counts(ctx)
 	if err != nil {
-		return repeat.Status{}, err
+		return reloop.Status{}, err
 	}
-	return repeat.Status{
+	return reloop.Status{
 		Daemon:  s.DaemonState(),
 		DataDir: s.st.DataDir(),
 		DBPath:  s.st.DBPath(),
@@ -140,9 +140,9 @@ func (s *service) Status(ctx context.Context) (repeat.Status, error) {
 //
 // The daemon holds the lock for its lifetime.
 // The OS releases it on exit, so stale state is impossible.
-func (s *service) DaemonState() repeat.DaemonStatus {
+func (s *service) DaemonState() reloop.DaemonStatus {
 	pid, startedAt, running, _ := daemon.ProbeRunLock(s.st.DataDir())
-	st := repeat.DaemonStatus{Supervised: daemon.IsSupervised(s.st.DataDir())}
+	st := reloop.DaemonStatus{Supervised: daemon.IsSupervised(s.st.DataDir())}
 	if running {
 		st.Running = true
 		st.PID = pid

@@ -16,11 +16,11 @@ import (
 // var is set. The fake takes the run lock and parks, so stop and
 // signal tests act on a real lock holder.
 func TestMain(m *testing.M) {
-	dir := os.Getenv("REPEAT_TEST_HOLD_LOCK")
+	dir := os.Getenv("RELOOP_TEST_HOLD_LOCK")
 	if dir == "" {
 		os.Exit(m.Run())
 	}
-	holdLock(dir, os.Getenv("REPEAT_TEST_IGNORE_TERM") == "1")
+	holdLock(dir, os.Getenv("RELOOP_TEST_IGNORE_TERM") == "1")
 	os.Exit(0)
 }
 
@@ -46,9 +46,9 @@ func holdLock(dir string, ignoreTerm bool) {
 func spawnLockHolder(t *testing.T, dir string, ignoreTerm bool) {
 	t.Helper()
 	cmd := exec.Command(os.Args[0])
-	cmd.Env = append(os.Environ(), "REPEAT_TEST_HOLD_LOCK="+dir)
+	cmd.Env = append(os.Environ(), "RELOOP_TEST_HOLD_LOCK="+dir)
 	if ignoreTerm {
-		cmd.Env = append(cmd.Env, "REPEAT_TEST_IGNORE_TERM=1")
+		cmd.Env = append(cmd.Env, "RELOOP_TEST_IGNORE_TERM=1")
 	}
 	if err := cmd.Start(); err != nil {
 		t.Fatalf("start lock holder: %v", err)
@@ -88,7 +88,7 @@ func holdLockInTest(t *testing.T, dir, body string) {
 	if err := os.MkdirAll(dir, 0o700); err != nil {
 		t.Fatalf("mkdir: %v", err)
 	}
-	f, err := os.OpenFile(filepath.Join(dir, "repeat.lock"), os.O_CREATE|os.O_RDWR, 0o600)
+	f, err := os.OpenFile(filepath.Join(dir, "reloop.lock"), os.O_CREATE|os.O_RDWR, 0o600)
 	if err != nil {
 		t.Fatalf("open lock: %v", err)
 	}
@@ -219,9 +219,9 @@ func TestDataDirDefault(t *testing.T) {
 	if err != nil {
 		t.Fatalf("DataDir: %v", err)
 	}
-	want := filepath.Join("/fake/home", ".local", "share", "repeat")
+	want := filepath.Join("/fake/home", ".local", "share", "reloop")
 	if runtime.GOOS == "darwin" {
-		want = filepath.Join("/fake/home", "Library", "Application Support", "repeat")
+		want = filepath.Join("/fake/home", "Library", "Application Support", "reloop")
 	}
 	if dir != want {
 		t.Errorf("DataDir = %q, want %q", dir, want)
@@ -238,7 +238,7 @@ func TestDataDirXDG(t *testing.T) {
 	if err != nil {
 		t.Fatalf("DataDir: %v", err)
 	}
-	if want := filepath.Join("/fake/xdg", "repeat"); dir != want {
+	if want := filepath.Join("/fake/xdg", "reloop"); dir != want {
 		t.Errorf("DataDir = %q, want %q", dir, want)
 	}
 }
@@ -268,7 +268,7 @@ func TestProbeRunLockUnreadableDir(t *testing.T) {
 		t.Skip("root ignores directory permissions")
 	}
 	dir := t.TempDir()
-	if err := os.WriteFile(filepath.Join(dir, "repeat.lock"), nil, 0o600); err != nil {
+	if err := os.WriteFile(filepath.Join(dir, "reloop.lock"), nil, 0o600); err != nil {
 		t.Fatalf("write lock: %v", err)
 	}
 	if err := os.Chmod(dir, 0o000); err != nil {

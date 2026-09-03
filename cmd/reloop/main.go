@@ -26,7 +26,7 @@ func main() { os.Exit(run()) }
 // SIGINT surfaces as the conventional exit 130, which NotifyContext
 // cannot report. SIGTERM keeps the plain error path: the supervised
 // daemon must exit 0 after draining, or Restart=on-failure would
-// respawn it after every `repeat stop`.
+// respawn it after every `reloop stop`.
 func run() int {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()

@@ -11,12 +11,12 @@ import (
 	"strings"
 	"unicode"
 
-	"github.com/mahibulhaque/repeat/internal/repeat"
+	"github.com/mahibulhaque/reloop/internal/reloop"
 )
 
 const (
-	launchLabel = "dev.repeat.repeatd" // launchd plist Label (macOS)
-	unitName    = "repeatd.service"    // systemd --user unit filename (linux)
+	launchLabel = "dev.reloop.reloopd" // launchd plist Label (macOS)
+	unitName    = "reloopd.service"    // systemd --user unit filename (linux)
 )
 
 // Install writes the platform supervisor unit and starts it.
@@ -31,7 +31,7 @@ const (
 //   - Linux: systemd --user unit.
 //
 // The daemon starts at login and restarts after a crash. The daemon
-// stays stopped after 'repeat stop' on both platforms.
+// stays stopped after 'reloop stop' on both platforms.
 //
 // Install is idempotent and self-healing. When the on-disk unit
 // already matches the desired content it is a no-op and installed is
@@ -55,7 +55,7 @@ func Install(binary, dataDir string, daemonArgs ...string) (installed bool, err 
 		desired = renderSystemdUnit(binary, dataDir, daemonArgs)
 		apply = installSystemd
 	default:
-		return false, repeat.ErrUnsupportedOS
+		return false, reloop.ErrUnsupportedOS
 	}
 	existing, readErr := os.ReadFile(p)
 	if readErr == nil && string(existing) == desired {
@@ -149,7 +149,7 @@ func unitPath() (string, error) {
 		}
 		return filepath.Join(base, "systemd", "user", unitName), nil
 	default:
-		return "", repeat.ErrUnsupportedOS
+		return "", reloop.ErrUnsupportedOS
 	}
 }
 
@@ -164,7 +164,7 @@ var xmlEscape = strings.NewReplacer("&", "&amp;", "<", "&lt;", ">", "&gt;").Repl
 // renderLaunchdPlist builds the LaunchAgent definition.
 //
 // KeepAlive with SuccessfulExit=false restarts the daemon only after
-// a crash. The daemon exits 0 on 'repeat stop' and launchd leaves it
+// a crash. The daemon exits 0 on 'reloop stop' and launchd leaves it
 // stopped. systemd behaves the same with Restart=on-failure.
 func renderLaunchdPlist(binary, dataDir string, daemonArgs []string) string {
 	var args strings.Builder
@@ -216,7 +216,7 @@ func renderSystemdUnit(binary, dataDir string, daemonArgs []string) string {
 		tokens = append(tokens, systemdQuote(a))
 	}
 	return fmt.Sprintf(`[Unit]
-Description=repeat job scheduler daemon
+Description=reloop job scheduler daemon
 After=default.target
 
 [Service]

@@ -6,7 +6,7 @@ import (
 	"io"
 	"os"
 
-	"github.com/mahibulhaque/repeat/internal/daemon"
+	"github.com/mahibulhaque/reloop/internal/daemon"
 	"github.com/spf13/cobra"
 )
 
@@ -14,14 +14,14 @@ func newKillCmd() *cobra.Command {
 	var force bool
 	cmd := &cobra.Command{
 		Use:   "kill",
-		Short: "Purge every trace of repeat from this machine.",
+		Short: "Purge every trace of reloop from this machine.",
 		Long: `Stop the running daemon, remove the launchd/systemd supervisor unit,
 delete the data directory (database, lock files, log) and finally remove
-the repeat binary itself.
+the reloop binary itself.
 
 Destructive and irreversible. Defaults to a dry run that prints the
 plan without touching anything. Pass --force (-f) to actually do it.`,
-		Example: "  repeat kill            # dry-run, show the plan\n  repeat kill --force    # actually wipe everything",
+		Example: "  reloop kill            # dry-run, show the plan\n  reloop kill --force    # actually wipe everything",
 		Args:    cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, _ []string) error {
 			return kill(cmd, force)
@@ -114,7 +114,7 @@ func step(out io.Writer, perform bool, doing, planned string, fn func() error) e
 	return fn()
 }
 
-// stopDaemon does what 'repeat stop' does.
+// stopDaemon does what 'reloop stop' does.
 //
 // It stays silent when no daemon is running.
 // kill does not need that line.

@@ -1,12 +1,12 @@
 
 .PHONY: build test vet lint tidy clean run e2e e2e-linux e2e-systemd
 
-BIN := bin/repeat
+BIN := bin/reloop
 PKG := ./...
 
 build:
 	@mkdir -p bin
-	go build -o $(BIN) ./cmd/repeat
+	go build -o $(BIN) ./cmd/reloop
 
 test:
 	go test -race -count=1 $(PKG)
@@ -33,10 +33,10 @@ e2e:
 	bash tests/e2e/run.sh
 
 e2e-linux:
-	docker build -f tests/e2e/Dockerfile -t repeat-e2e .
-	docker run --rm repeat-e2e
+	docker build -f tests/e2e/Dockerfile -t reloop-e2e .
+	docker run --rm reloop-e2e
 
-# Same harness inside a booted-systemd container, so 'repeat install'
+# Same harness inside a booted-systemd container, so 'reloop install'
 # runs against a real systemd --user manager.
 e2e-systemd:
 	bash tests/e2e/systemd.sh

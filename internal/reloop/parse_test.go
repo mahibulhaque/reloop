@@ -1,4 +1,4 @@
-package repeat
+package reloop
 
 import (
 	"errors"
@@ -104,7 +104,7 @@ func TestParseAtDSTSpringForwardGap(t *testing.T) {
 
 // TestParseAtDSTFallBackAmbiguity checks which of the two occurrences an
 // ambiguous clock time resolves to. US fall back 2026: on Nov 1 the
-// clock repeats 01:00-02:00, so "1:30am" happens twice. time.Date
+// clock reloops 01:00-02:00, so "1:30am" happens twice. time.Date
 // picks the first occurrence (EDT, -04:00).
 func TestParseAtDSTFallBackAmbiguity(t *testing.T) {
 	ny, err := time.LoadLocation("America/New_York")
@@ -123,16 +123,16 @@ func TestParseAtDSTFallBackAmbiguity(t *testing.T) {
 	}
 }
 
-// TestNextFireCronAcrossDST checks robfig's DST handling, which repeat
+// TestNextFireCronAcrossDST checks robfig's DST handling, which reloop
 // inherits through NextFire.
 //
 // Documented behavior:
 //   - A fire scheduled inside the spring-forward gap is skipped for
 //     that day entirely, not shifted to the next valid clock time.
-//   - An hourly job fires the repeated fall-back hour twice, once per
+//   - An hourly job fires the relooped fall-back hour twice, once per
 //     UTC offset.
 //
-// Neither is repeat's choice to make. The tests exist so a robfig upgrade
+// Neither is reloop's choice to make. The tests exist so a robfig upgrade
 // that changes the rules fails loudly here.
 func TestNextFireCronAcrossDST(t *testing.T) {
 	ny, err := time.LoadLocation("America/New_York")
@@ -150,7 +150,7 @@ func TestNextFireCronAcrossDST(t *testing.T) {
 		}
 	})
 
-	t.Run("fall_back_fires_repeated_hour_twice", func(t *testing.T) {
+	t.Run("fall_back_fires_relooped_hour_twice", func(t *testing.T) {
 		job := Job{Kind: KindCron, Cron: "0 * * * *", Status: StatusEnabled}
 		first := NextFire(job, time.Date(2026, 11, 1, 0, 30, 0, 0, ny))
 		second := NextFire(job, first)
@@ -161,7 +161,7 @@ func TestNextFireCronAcrossDST(t *testing.T) {
 				first.Format(time.RFC3339), second.Format(time.RFC3339))
 		}
 		if second.Sub(first) != time.Hour {
-			t.Errorf("repeated hour gap = %s, want 1h of real time", second.Sub(first))
+			t.Errorf("relooped hour gap = %s, want 1h of real time", second.Sub(first))
 		}
 	})
 }

@@ -13,8 +13,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/mahibulhaque/repeat/internal/repeat"
-	"github.com/mahibulhaque/repeat/internal/store"
+	"github.com/mahibulhaque/reloop/internal/reloop"
+	"github.com/mahibulhaque/reloop/internal/store"
 )
 
 func TestExecRunnerResolvesBinaryViaSnapshotPATH(t *testing.T) {
@@ -30,7 +30,7 @@ func TestExecRunnerResolvesBinaryViaSnapshotPATH(t *testing.T) {
 	t.Setenv("PATH", "/usr/bin:/bin") // a daemon-like PATH that lacks dir
 
 	sb := newCappedBuf(store.MaxOutputBytes)
-	code, err := execRunner{}.Run(t.Context(), repeat.Job{
+	code, err := execRunner{}.Run(t.Context(), reloop.Job{
 		Command: []string{"myecho", "from snapshot"},
 		Env:     []string{"PATH=" + dir},
 	}, sb)
@@ -61,7 +61,7 @@ func TestExecRunnerHonoursSIGTERMGrace(t *testing.T) {
 		cancel(errTestCtxEnded)
 	}()
 
-	code, err := runner.Run(ctx, repeat.Job{
+	code, err := runner.Run(ctx, reloop.Job{
 		// `sleep` is a child of sh.
 		// It does not receive signals delivered to sh.
 		// `& wait $!` makes sh's wait interruptible.
@@ -78,7 +78,7 @@ func TestExecRunnerHonoursSIGTERMGrace(t *testing.T) {
 
 func TestExecRunnerCapturesNonZeroExit(t *testing.T) {
 	sb := newCappedBuf(store.MaxOutputBytes)
-	code, err := execRunner{}.Run(t.Context(), repeat.Job{Command: []string{"sh", "-c", "echo hi; exit 7"}}, sb)
+	code, err := execRunner{}.Run(t.Context(), reloop.Job{Command: []string{"sh", "-c", "echo hi; exit 7"}}, sb)
 	if err != nil {
 		t.Fatalf("Run: %v", err)
 	}
@@ -91,7 +91,7 @@ func TestExecRunnerCapturesNonZeroExit(t *testing.T) {
 }
 
 func TestExecRunnerReportsStartError(t *testing.T) {
-	_, err := execRunner{}.Run(t.Context(), repeat.Job{Command: []string{"/no/such/binary"}}, io.Discard)
+	_, err := execRunner{}.Run(t.Context(), reloop.Job{Command: []string{"/no/such/binary"}}, io.Discard)
 	if err == nil {
 		t.Errorf("Run(missing binary) = nil, want error")
 	}
@@ -102,11 +102,11 @@ func TestExecRunnerReportsStartError(t *testing.T) {
 
 // TestExecRunnerCapturesStartErrorInOutput checks that a job whose
 // argv[0] does not exist gets the start error written to its run
-// log. Without that, `repeat logs JOB` shows nothing and the user has
+// log. Without that, `reloop logs JOB` shows nothing and the user has
 // no way to diagnose the failure.
 func TestExecRunnerCapturesStartErrorInOutput(t *testing.T) {
 	sb := newCappedBuf(store.MaxOutputBytes)
-	_, err := execRunner{}.Run(t.Context(), repeat.Job{Command: []string{"echo hello"}}, sb)
+	_, err := execRunner{}.Run(t.Context(), reloop.Job{Command: []string{"echo hello"}}, sb)
 	if err == nil {
 		t.Errorf("Run(command with space in argv[0]) = nil, want error")
 	}
@@ -119,9 +119,9 @@ func TestExecRunnerDoesNotFallBackToDaemonPATHWhenSnapshotPATHMisses(t *testing.
 	t.Setenv("PATH", "/usr/bin:/bin")
 
 	sb := newCappedBuf(store.MaxOutputBytes)
-	code, err := execRunner{}.Run(t.Context(), repeat.Job{
+	code, err := execRunner{}.Run(t.Context(), reloop.Job{
 		Command: []string{"sh", "-c", "echo should-not-run"},
-		Env:     []string{"PATH=/definitely/not/a/real/repeat/path"},
+		Env:     []string{"PATH=/definitely/not/a/real/reloop/path"},
 	}, sb)
 	if err == nil {
 		t.Errorf("Run(snapshot PATH miss) = nil, want error; exit code=%d stdout=%q", code, string(sb.Bytes()))

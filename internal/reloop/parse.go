@@ -1,4 +1,4 @@
-package repeat
+package reloop
 
 import (
 	"fmt"
@@ -12,7 +12,7 @@ import (
 	"github.com/robfig/cron/v3"
 )
 
-// maxSchedulable is the latest instant repeat accepts for a fire time.
+// maxSchedulable is the latest instant reloop accepts for a fire time.
 // RFC3339 cannot express a five-digit year, and the CLI renders times
 // in the local zone, where the largest legal offset is +14:00. Stopping
 // 14 hours before the end of year 9999 UTC keeps every stored time

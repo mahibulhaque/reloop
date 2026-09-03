@@ -1,4 +1,4 @@
-module github.com/mahibulhaque/repeat
+module github.com/mahibulhaque/reloop
 
 go 1.27.1
 

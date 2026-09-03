@@ -23,7 +23,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/mahibulhaque/repeat/internal/repeat"
+	"github.com/mahibulhaque/reloop/internal/reloop"
 	"modernc.org/sqlite"
 )
 
@@ -89,10 +89,10 @@ const DefaultListLimit = 100
 // ListOpts filters Store.ListJobs results. The zero value returns
 // every job ordered by created_at descending.
 type ListOpts struct {
-	Kind   repeat.JobKind   // empty = both kinds
-	Status repeat.JobStatus // empty = all statuses
+	Kind   reloop.JobKind   // empty = both kinds
+	Status reloop.JobStatus // empty = all statuses
 	Limit  int              // <=0 means no cap at the store layer
-	// Offset skips rows. LIMIT/OFFSET paging can skip or repeat rows
+	// Offset skips rows. LIMIT/OFFSET paging can skip or reloop rows
 	// under concurrent writes, which is fine for a single-user store.
 	Offset int
 }
@@ -119,14 +119,14 @@ func Open(ctx context.Context, dataDir string) (*Store, error) {
 		dbPath = ":memory:"
 		// A unique name per Open keeps test stores isolated.
 		// cache=shared keeps the database alive across pool reconnects.
-		dsn = fmt.Sprintf("file:repeatmem%d?mode=memory&cache=shared&_txlock=immediate&_pragma=foreign_keys(1)&_pragma=busy_timeout(5000)",
+		dsn = fmt.Sprintf("file:reloopmem%d?mode=memory&cache=shared&_txlock=immediate&_pragma=foreign_keys(1)&_pragma=busy_timeout(5000)",
 			rand.Uint64())
 	default:
 		// 0700: env snapshots in this directory routinely carry secrets.
 		if err := os.MkdirAll(dataDir, 0o700); err != nil {
 			return nil, fmt.Errorf("mkdir data dir: %w", err)
 		}
-		dbPath = filepath.Join(dataDir, "repeat.db")
+		dbPath = filepath.Join(dataDir, "reloop.db")
 		// The settings apply in DSN order.
 		//
 		//  1. _txlock=immediate takes the write lock at BEGIN, so
@@ -242,7 +242,7 @@ func applySchema(ctx context.Context, db *sql.DB) error {
 				return fmt.Errorf("inspect schema: %w", err)
 			}
 			if hasJobs {
-				return fmt.Errorf("%w: database written by repeat v0.1.x", errFormatMismatch)
+				return fmt.Errorf("%w: database written by reloop v0.1.x", errFormatMismatch)
 			}
 		}
 		if _, err := tx.ExecContext(ctx, schema); err != nil {
@@ -316,7 +316,7 @@ func (s *Store) Close() error {
 // AddJob validates and inserts a new enabled job. Validation lives
 // here, not only in the CLI, so no caller can insert a job the
 // scheduler can never fire.
-func (s *Store) AddJob(ctx context.Context, spec repeat.JobSpec, now time.Time) (repeat.Job, error) {
+func (s *Store) AddJob(ctx context.Context, spec reloop.JobSpec, now time.Time) (reloop.Job, error) {
 	const insertJobSQL = `
 		INSERT INTO jobs
 			(id, kind, name, command_json, env_json, cron_expression, fire_at, status,
@@ -327,7 +327,7 @@ func (s *Store) AddJob(ctx context.Context, spec repeat.JobSpec, now time.Time) 
 	// table output.
 	spec.Cron = strings.TrimSpace(spec.Cron)
 	if err := spec.Validate(now); err != nil {
-		return repeat.Job{}, err
+		return reloop.Job{}, err
 	}
 	// Marshalling a []string cannot fail. nil still becomes '[]' so
 	// the column never holds JSON null. Bound as strings because the
@@ -340,22 +340,22 @@ func (s *Store) AddJob(ctx context.Context, spec repeat.JobSpec, now time.Time) 
 		envJSON = string(envBytes)
 	}
 
-	kind := repeat.KindOneshot
+	kind := reloop.KindOneshot
 	fireAt := int64(0)
 	if spec.Cron != "" {
-		kind = repeat.KindCron
+		kind = reloop.KindCron
 	} else {
 		fireAt = spec.FireAt.UnixMilli()
 	}
 	// Compute next_fire_at before insert so the scheduler finds the
 	// new job through its indexed due scan.
-	probe := repeat.Job{
+	probe := reloop.Job{
 		Kind:   kind,
 		Cron:   spec.Cron,
 		FireAt: spec.FireAt,
-		Status: repeat.StatusEnabled,
+		Status: reloop.StatusEnabled,
 	}
-	nextFire := msOrZero(repeat.NextFire(probe, now))
+	nextFire := msOrZero(reloop.NextFire(probe, now))
 
 	for range 8 {
 		id := newJobID()
@@ -367,12 +367,12 @@ func (s *Store) AddJob(ctx context.Context, spec repeat.JobSpec, now time.Time) 
 			if sqliteCodeIs(err, sqliteConstraint) {
 				continue
 			}
-			return repeat.Job{}, fmt.Errorf("insert job: %w", err)
+			return reloop.Job{}, fmt.Errorf("insert job: %w", err)
 		}
 		// Return the row just written without re-reading it. The time
 		// fields go through the same millisecond conversion a SELECT
 		// would produce.
-		return repeat.Job{
+		return reloop.Job{
 			ID:         id,
 			Kind:       kind,
 			Name:       spec.Name,
@@ -380,27 +380,27 @@ func (s *Store) AddJob(ctx context.Context, spec repeat.JobSpec, now time.Time) 
 			Env:        spec.Env,
 			Cron:       spec.Cron,
 			FireAt:     timeFromMilli(fireAt),
-			Status:     repeat.StatusEnabled,
+			Status:     reloop.StatusEnabled,
 			NextFireAt: timeFromMilli(nextFire),
 			CreatedAt:  timeFromMilli(now.UnixMilli()),
 			UpdatedAt:  timeFromMilli(now.UnixMilli()),
 		}, nil
 	}
-	return repeat.Job{}, fmt.Errorf("insert job: exhausted ID retries")
+	return reloop.Job{}, fmt.Errorf("insert job: exhausted ID retries")
 }
 
 const idAlphabet = "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz"
 
-func newJobID() repeat.JobID {
+func newJobID() reloop.JobID {
 	var buf [5]byte
 	for i := range buf {
 		buf[i] = idAlphabet[rand.IntN(len(idAlphabet))]
 	}
-	return repeat.JobID(buf[:])
+	return reloop.JobID(buf[:])
 }
 
 // Job returns the job with id.
-func (s *Store) Job(ctx context.Context, id repeat.JobID) (repeat.Job, error) {
+func (s *Store) Job(ctx context.Context, id reloop.JobID) (reloop.Job, error) {
 	const jobByIDSQL = `
 		SELECT id, kind, name, command_json, env_json, cron_expression, fire_at,
 		       status, last_run_at, last_status, next_fire_at, created_at, updated_at
@@ -408,14 +408,14 @@ func (s *Store) Job(ctx context.Context, id repeat.JobID) (repeat.Job, error) {
 		WHERE id = ?`
 	job, err := scanJob(s.db.QueryRowContext(ctx, jobByIDSQL, string(id)))
 	if errors.Is(err, sql.ErrNoRows) {
-		return repeat.Job{}, fmt.Errorf("%w: job %q", repeat.ErrNotFound, id)
+		return reloop.Job{}, fmt.Errorf("%w: job %q", reloop.ErrNotFound, id)
 	}
 	return job, err
 }
 
 // JobByName returns the lowest-ID exact-name match. Names are not
 // unique.
-func (s *Store) JobByName(ctx context.Context, name string) (repeat.Job, error) {
+func (s *Store) JobByName(ctx context.Context, name string) (reloop.Job, error) {
 	const jobByNameSQL = `
 		SELECT id, kind, name, command_json, env_json, cron_expression, fire_at,
 		       status, last_run_at, last_status, next_fire_at, created_at, updated_at
@@ -425,7 +425,7 @@ func (s *Store) JobByName(ctx context.Context, name string) (repeat.Job, error) 
 		LIMIT 1`
 	job, err := scanJob(s.db.QueryRowContext(ctx, jobByNameSQL, name))
 	if errors.Is(err, sql.ErrNoRows) {
-		return repeat.Job{}, fmt.Errorf("%w: job %q", repeat.ErrNotFound, name)
+		return reloop.Job{}, fmt.Errorf("%w: job %q", reloop.ErrNotFound, name)
 	}
 	return job, err
 }
@@ -433,7 +433,7 @@ func (s *Store) JobByName(ctx context.Context, name string) (repeat.Job, error) 
 // ListJobs returns jobs matching opts, most recently created first.
 // Env is left empty: no list consumer execs the job, and the env
 // snapshot is by far the widest column.
-func (s *Store) ListJobs(ctx context.Context, opts ListOpts) ([]repeat.Job, error) {
+func (s *Store) ListJobs(ctx context.Context, opts ListOpts) ([]reloop.Job, error) {
 	// An empty filter argument matches every row, LIMIT -1 is
 	// uncapped, and OFFSET 0 is a no-op, so one statement covers
 	// every filter and paging combination.
@@ -456,7 +456,7 @@ func (s *Store) ListJobs(ctx context.Context, opts ListOpts) ([]repeat.Job, erro
 		return nil, fmt.Errorf("list jobs: %w", err)
 	}
 	defer rows.Close()
-	jobs := make([]repeat.Job, 0)
+	jobs := make([]reloop.Job, 0)
 	for rows.Next() {
 		job, err := scanJob(rows)
 		if err != nil {
@@ -471,7 +471,7 @@ func (s *Store) ListJobs(ctx context.Context, opts ListOpts) ([]repeat.Job, erro
 }
 
 // DeleteJob removes the job with id. Its run history cascades away.
-func (s *Store) DeleteJob(ctx context.Context, id repeat.JobID) error {
+func (s *Store) DeleteJob(ctx context.Context, id reloop.JobID) error {
 	const deleteJobSQL = `DELETE FROM jobs WHERE id = ?`
 	return s.execJob(ctx, "delete job", id, deleteJobSQL, string(id))
 }
@@ -479,7 +479,7 @@ func (s *Store) DeleteJob(ctx context.Context, id repeat.JobID) error {
 // DisableJob marks a job disabled. The done-job guard sits in the SQL
 // so it cannot race the daemon marking the job done at the same
 // moment. A done job is ErrConflict, a missing one ErrNotFound.
-func (s *Store) DisableJob(ctx context.Context, id repeat.JobID, now time.Time) error {
+func (s *Store) DisableJob(ctx context.Context, id reloop.JobID, now time.Time) error {
 	const disableJobSQL = `
 		UPDATE jobs SET status = 'disabled', updated_at = ?
 		WHERE id = ? AND status != 'done'`
@@ -488,7 +488,7 @@ func (s *Store) DisableJob(ctx context.Context, id repeat.JobID, now time.Time) 
 	if err == nil {
 		return nil
 	}
-	if !errors.Is(err, repeat.ErrNotFound) {
+	if !errors.Is(err, reloop.ErrNotFound) {
 		return err
 	}
 	// Zero rows means missing or already done. Look up which.
@@ -496,9 +496,9 @@ func (s *Store) DisableJob(ctx context.Context, id repeat.JobID, now time.Time) 
 	if jerr != nil {
 		return err
 	}
-	if job.Status == repeat.StatusDone {
+	if job.Status == reloop.StatusDone {
 		return fmt.Errorf("%w: job %s already ran, a done one-shot has nothing left to disable",
-			repeat.ErrConflict, id)
+			reloop.ErrConflict, id)
 	}
 	return err
 }
@@ -512,7 +512,7 @@ func (s *Store) DisableJob(ctx context.Context, id repeat.JobID, now time.Time) 
 //  2. A done or claimed one-shot stays put, because re-arming it
 //     would fire the command a second time. Both are ErrConflict.
 //  3. A missing job is ErrNotFound.
-func (s *Store) EnableJob(ctx context.Context, id repeat.JobID, next time.Time, now time.Time) error {
+func (s *Store) EnableJob(ctx context.Context, id reloop.JobID, next time.Time, now time.Time) error {
 	const enableJobSQL = `
 		UPDATE jobs SET status = 'enabled', next_fire_at = ?, updated_at = ?
 		WHERE id = ?
@@ -523,7 +523,7 @@ func (s *Store) EnableJob(ctx context.Context, id repeat.JobID, next time.Time, 
 	if err == nil {
 		return nil
 	}
-	if !errors.Is(err, repeat.ErrNotFound) {
+	if !errors.Is(err, reloop.ErrNotFound) {
 		return err
 	}
 	// Zero rows means missing or guarded. Look up which.
@@ -531,23 +531,23 @@ func (s *Store) EnableJob(ctx context.Context, id repeat.JobID, next time.Time, 
 	if jerr != nil {
 		return err
 	}
-	if job.Status == repeat.StatusEnabled {
+	if job.Status == reloop.StatusEnabled {
 		return nil
 	}
-	if job.Status == repeat.StatusDone {
+	if job.Status == reloop.StatusDone {
 		return fmt.Errorf("%w: job %s already ran and one-shots fire once, add a new job to run it again",
-			repeat.ErrConflict, id)
+			reloop.ErrConflict, id)
 	}
 	if job.NextFireAt.IsZero() {
 		return fmt.Errorf("%w: job %s already started, its run is in flight or awaiting recovery at the next daemon start",
-			repeat.ErrConflict, id)
+			reloop.ErrConflict, id)
 	}
 	return err
 }
 
 // DueJobs returns enabled jobs due at or before now, soonest first.
 // The (status, next_fire_at) index keeps this a range scan.
-func (s *Store) DueJobs(ctx context.Context, now time.Time) ([]repeat.Job, error) {
+func (s *Store) DueJobs(ctx context.Context, now time.Time) ([]reloop.Job, error) {
 	const dueJobsSQL = `
 		SELECT id, kind, name, command_json, env_json, cron_expression, fire_at,
 		       status, last_run_at, last_status, next_fire_at, created_at, updated_at
@@ -559,7 +559,7 @@ func (s *Store) DueJobs(ctx context.Context, now time.Time) ([]repeat.Job, error
 		return nil, fmt.Errorf("due jobs: %w", err)
 	}
 	defer rows.Close()
-	jobs := make([]repeat.Job, 0)
+	jobs := make([]reloop.Job, 0)
 	for rows.Next() {
 		job, err := scanJob(rows)
 		if err != nil {
@@ -594,7 +594,7 @@ func (s *Store) SoonestDeadline(ctx context.Context, now time.Time) (time.Time, 
 }
 
 // ListRunsSince returns runs started at or after since, oldest first.
-func (s *Store) ListRunsSince(ctx context.Context, jobID repeat.JobID, since time.Time) ([]repeat.Run, error) {
+func (s *Store) ListRunsSince(ctx context.Context, jobID reloop.JobID, since time.Time) ([]reloop.Run, error) {
 	const runsSinceSQL = `
 		SELECT id, job_id, started_at, finished_at, exit_code, status
 		FROM runs
@@ -605,7 +605,7 @@ func (s *Store) ListRunsSince(ctx context.Context, jobID repeat.JobID, since tim
 		return nil, fmt.Errorf("list runs since: %w", err)
 	}
 	defer rows.Close()
-	runs := make([]repeat.Run, 0)
+	runs := make([]reloop.Run, 0)
 	for rows.Next() {
 		run, err := scanRun(rows)
 		if err != nil {
@@ -620,7 +620,7 @@ func (s *Store) ListRunsSince(ctx context.Context, jobID repeat.JobID, since tim
 }
 
 // ListRunsAfter returns runs inserted after afterID, oldest first.
-func (s *Store) ListRunsAfter(ctx context.Context, jobID repeat.JobID, afterID int64) ([]repeat.Run, error) {
+func (s *Store) ListRunsAfter(ctx context.Context, jobID reloop.JobID, afterID int64) ([]reloop.Run, error) {
 	const runsAfterSQL = `
 		SELECT id, job_id, started_at, finished_at, exit_code, status
 		FROM runs
@@ -631,7 +631,7 @@ func (s *Store) ListRunsAfter(ctx context.Context, jobID repeat.JobID, afterID i
 		return nil, fmt.Errorf("list runs after: %w", err)
 	}
 	defer rows.Close()
-	runs := make([]repeat.Run, 0)
+	runs := make([]reloop.Run, 0)
 	for rows.Next() {
 		run, err := scanRun(rows)
 		if err != nil {
@@ -646,9 +646,9 @@ func (s *Store) ListRunsAfter(ctx context.Context, jobID repeat.JobID, afterID i
 }
 
 // LatestRun returns the newest completed run for jobID. Open running
-// rows are excluded, so `repeat logs` never shows the empty output of a
+// rows are excluded, so `reloop logs` never shows the empty output of a
 // run that is still going. OpenRun finds those.
-func (s *Store) LatestRun(ctx context.Context, jobID repeat.JobID) (repeat.Run, error) {
+func (s *Store) LatestRun(ctx context.Context, jobID reloop.JobID) (reloop.Run, error) {
 	const latestRunSQL = `
 		SELECT id, job_id, started_at, finished_at, exit_code, status
 		FROM runs
@@ -657,14 +657,14 @@ func (s *Store) LatestRun(ctx context.Context, jobID repeat.JobID) (repeat.Run, 
 		LIMIT 1`
 	run, err := scanRun(s.db.QueryRowContext(ctx, latestRunSQL, string(jobID)))
 	if errors.Is(err, sql.ErrNoRows) {
-		return repeat.Run{}, fmt.Errorf("%w: no runs for job %q", repeat.ErrNotFound, jobID)
+		return reloop.Run{}, fmt.Errorf("%w: no runs for job %q", reloop.ErrNotFound, jobID)
 	}
 	return run, err
 }
 
 // OpenRun returns the job's running row, if one is open. Claim allows
 // at most one open row per job.
-func (s *Store) OpenRun(ctx context.Context, jobID repeat.JobID) (repeat.Run, error) {
+func (s *Store) OpenRun(ctx context.Context, jobID reloop.JobID) (reloop.Run, error) {
 	const openRunSQL = `
 		SELECT id, job_id, started_at, finished_at, exit_code, status
 		FROM runs
@@ -672,7 +672,7 @@ func (s *Store) OpenRun(ctx context.Context, jobID repeat.JobID) (repeat.Run, er
 		LIMIT 1`
 	run, err := scanRun(s.db.QueryRowContext(ctx, openRunSQL, string(jobID)))
 	if errors.Is(err, sql.ErrNoRows) {
-		return repeat.Run{}, fmt.Errorf("%w: no open run for job %q", repeat.ErrNotFound, jobID)
+		return reloop.Run{}, fmt.Errorf("%w: no open run for job %q", reloop.ErrNotFound, jobID)
 	}
 	return run, err
 }
@@ -683,7 +683,7 @@ func (s *Store) RunLog(ctx context.Context, runID int64) ([]byte, error) {
 	var out []byte
 	err := s.db.QueryRowContext(ctx, runLogSQL, runID).Scan(&out)
 	if errors.Is(err, sql.ErrNoRows) {
-		return nil, fmt.Errorf("%w: run %d", repeat.ErrNotFound, runID)
+		return nil, fmt.Errorf("%w: run %d", reloop.ErrNotFound, runID)
 	}
 	if err != nil {
 		return nil, fmt.Errorf("read output: %w", err)
@@ -763,11 +763,11 @@ func (s *Store) GC(ctx context.Context, now time.Time, perJob int, maxAge time.D
 	return nil
 }
 
-// Counts returns the aggregate used by repeat status, in one round-trip.
+// Counts returns the aggregate used by reloop status, in one round-trip.
 // In flight means the job has an open running row, the state
 // machine's own encoding, so this count cannot drift from what Claim
 // and Finish write.
-func (s *Store) Counts(ctx context.Context) (repeat.JobCounts, error) {
+func (s *Store) Counts(ctx context.Context) (reloop.JobCounts, error) {
 	const countsSQL = `
 		SELECT
 			COUNT(*),
@@ -779,18 +779,18 @@ func (s *Store) Counts(ctx context.Context) (repeat.JobCounts, error) {
 			COUNT(*) FILTER (WHERE kind = 'oneshot' AND EXISTS (
 				SELECT 1 FROM runs WHERE runs.job_id = jobs.id AND runs.status = 'running'))
 		FROM jobs`
-	var c repeat.JobCounts
+	var c reloop.JobCounts
 	row := s.db.QueryRowContext(ctx, countsSQL)
 	if err := row.Scan(&c.Total, &c.Cron, &c.CronDisabled,
 		&c.OneshotPending, &c.OneshotDone, &c.OneshotDisabled, &c.OneshotInFlight); err != nil {
-		return repeat.JobCounts{}, fmt.Errorf("counts: %w", err)
+		return reloop.JobCounts{}, fmt.Errorf("counts: %w", err)
 	}
 	return c, nil
 }
 
 // execJob runs a single-job write, mapping zero affected rows to
 // ErrNotFound.
-func (s *Store) execJob(ctx context.Context, op string, id repeat.JobID, q string, args ...any) error {
+func (s *Store) execJob(ctx context.Context, op string, id reloop.JobID, q string, args ...any) error {
 	res, err := s.db.ExecContext(ctx, q, args...)
 	if err != nil {
 		return fmt.Errorf("%s: %w", op, err)
@@ -800,7 +800,7 @@ func (s *Store) execJob(ctx context.Context, op string, id repeat.JobID, q strin
 		return fmt.Errorf("%s rows affected: %w", op, err)
 	}
 	if n == 0 {
-		return fmt.Errorf("%w: job %q", repeat.ErrNotFound, id)
+		return fmt.Errorf("%w: job %q", reloop.ErrNotFound, id)
 	}
 	return nil
 }
@@ -813,9 +813,9 @@ type scanner interface {
 
 // scanJob reads one jobs row. Every job SELECT must list the columns
 // in this exact order.
-func scanJob(s scanner) (repeat.Job, error) {
+func scanJob(s scanner) (reloop.Job, error) {
 	var (
-		j             repeat.Job
+		j             reloop.Job
 		kind          string
 		cmdJSON       string
 		envJSON       string
@@ -830,41 +830,41 @@ func scanJob(s scanner) (repeat.Job, error) {
 	err := s.Scan(&j.ID, &kind, &j.Name, &cmdJSON, &envJSON, &j.Cron, &fireAtMilli,
 		&status, &lastRunMilli, &lastStatus, &nextFireMilli, &createdMilli, &updatedMilli)
 	if err != nil {
-		return repeat.Job{}, err
+		return reloop.Job{}, err
 	}
-	j.Kind = repeat.JobKind(kind)
-	j.Status = repeat.JobStatus(status)
-	j.LastStatus = repeat.RunStatus(lastStatus)
+	j.Kind = reloop.JobKind(kind)
+	j.Status = reloop.JobStatus(status)
+	j.LastStatus = reloop.RunStatus(lastStatus)
 	j.FireAt = timeFromMilli(fireAtMilli)
 	j.LastRunAt = timeFromMilli(lastRunMilli)
 	j.NextFireAt = timeFromMilli(nextFireMilli)
 	j.CreatedAt = timeFromMilli(createdMilli)
 	j.UpdatedAt = timeFromMilli(updatedMilli)
 	if err := json.Unmarshal([]byte(cmdJSON), &j.Command); err != nil {
-		return repeat.Job{}, fmt.Errorf("decode command: %w", err)
+		return reloop.Job{}, fmt.Errorf("decode command: %w", err)
 	}
 	if err := json.Unmarshal([]byte(envJSON), &j.Env); err != nil {
-		return repeat.Job{}, fmt.Errorf("decode env: %w", err)
+		return reloop.Job{}, fmt.Errorf("decode env: %w", err)
 	}
 	return j, nil
 }
 
 // scanRun reads one runs row. Every run SELECT must list the columns
 // in this exact order.
-func scanRun(s scanner) (repeat.Run, error) {
+func scanRun(s scanner) (reloop.Run, error) {
 	var (
-		r             repeat.Run
+		r             reloop.Run
 		startedMilli  int64
 		finishedMilli int64
 		status        string
 	)
 	err := s.Scan(&r.ID, &r.JobID, &startedMilli, &finishedMilli, &r.ExitCode, &status)
 	if err != nil {
-		return repeat.Run{}, err
+		return reloop.Run{}, err
 	}
 	r.StartedAt = timeFromMilli(startedMilli)
 	r.FinishedAt = timeFromMilli(finishedMilli)
-	r.Status = repeat.RunStatus(status)
+	r.Status = reloop.RunStatus(status)
 	return r, nil
 }
 

@@ -10,7 +10,7 @@ func newStatusCmd() *cobra.Command {
 		Long: `Report whether the daemon is running, whether a launchd/systemd
 supervisor is installed, the data directory and database path, plus
 aggregate counts of jobs by kind and one-shot completion state.`,
-		Example: "  repeat status\n  repeat status --json",
+		Example: "  reloop status\n  reloop status --json",
 		Args:    cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return withService(cmd, func(s *service) error {

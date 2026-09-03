@@ -15,8 +15,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/mahibulhaque/repeat/internal/repeat"
-	"github.com/mahibulhaque/repeat/internal/store"
+	"github.com/mahibulhaque/reloop/internal/reloop"
+	"github.com/mahibulhaque/reloop/internal/store"
 )
 
 // errTestCtxEnded is the cause attached to test-scoped contexts so
@@ -44,7 +44,7 @@ type recRunner struct {
 	written []string
 }
 
-func (r *recRunner) Run(ctx context.Context, job repeat.Job, out io.Writer) (int, error) {
+func (r *recRunner) Run(ctx context.Context, job reloop.Job, out io.Writer) (int, error) {
 	r.calls.Add(1)
 	r.mu.Lock()
 	r.written = append(r.written, job.Name)
@@ -70,7 +70,7 @@ func TestFireSkipsDeletedJob(t *testing.T) {
 	s := New(st, Config{runner: rr})
 	ctx := t.Context()
 
-	job, err := st.AddJob(ctx, repeat.JobSpec{Name: "gone", Command: []string{"x"}, Cron: "@every 1s"}, time.Now())
+	job, err := st.AddJob(ctx, reloop.JobSpec{Name: "gone", Command: []string{"x"}, Cron: "@every 1s"}, time.Now())
 	if err != nil {
 		t.Fatalf("AddJob: %v", err)
 	}
@@ -93,7 +93,7 @@ func TestFireSkipsDisabledJob(t *testing.T) {
 	s := New(st, Config{runner: rr})
 	ctx := t.Context()
 
-	job, err := st.AddJob(ctx, repeat.JobSpec{Name: "paused", Command: []string{"x"}, Cron: "@every 1s"}, time.Now())
+	job, err := st.AddJob(ctx, reloop.JobSpec{Name: "paused", Command: []string{"x"}, Cron: "@every 1s"}, time.Now())
 	if err != nil {
 		t.Fatalf("AddJob: %v", err)
 	}
@@ -126,7 +126,7 @@ func TestFireSkipsCronWithNoNextFire(t *testing.T) {
 	logger := slog.New(slog.NewTextHandler(&logBuf, nil))
 	s := New(st, Config{runner: rr, Logger: logger})
 
-	job := repeat.Job{ID: "AAAAA", Kind: repeat.KindCron, Cron: "not a cron", Status: repeat.StatusEnabled}
+	job := reloop.Job{ID: "AAAAA", Kind: reloop.KindCron, Cron: "not a cron", Status: reloop.StatusEnabled}
 	s.fire(t.Context(), time.Now(), job)
 	s.wg.Wait()
 
@@ -149,7 +149,7 @@ func TestFireConcurrentOneshotClaimRunsOnce(t *testing.T) {
 	ctx := t.Context()
 
 	now := time.Now()
-	job, err := st.AddJob(ctx, repeat.JobSpec{
+	job, err := st.AddJob(ctx, reloop.JobSpec{
 		Name: "once", Command: []string{"true"}, FireAt: now.Add(time.Hour),
 	}, now)
 	if err != nil {
@@ -170,7 +170,7 @@ func TestFireConcurrentOneshotClaimRunsOnce(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Job: %v", err)
 	}
-	if after.Status != repeat.StatusDone || !after.NextFireAt.IsZero() {
+	if after.Status != reloop.StatusDone || !after.NextFireAt.IsZero() {
 		t.Errorf("after concurrent fires: status=%s next=%s, want done/zero", after.Status, after.NextFireAt)
 	}
 }
@@ -184,7 +184,7 @@ func TestFireConcurrentCronClaimAdvancesOnce(t *testing.T) {
 	s := New(st, Config{runner: rr})
 	ctx := t.Context()
 
-	job, err := st.AddJob(ctx, repeat.JobSpec{
+	job, err := st.AddJob(ctx, reloop.JobSpec{
 		Name: "tick", Command: []string{"true"}, Cron: "@hourly",
 	}, time.Now())
 	if err != nil {
@@ -206,7 +206,7 @@ func TestFireConcurrentCronClaimAdvancesOnce(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Job: %v", err)
 	}
-	want := repeat.NextFire(job, due)
+	want := reloop.NextFire(job, due)
 	if !after.NextFireAt.Equal(want) {
 		t.Errorf("NextFireAt = %s, want advanced exactly once to %s", after.NextFireAt, want)
 	}
@@ -224,7 +224,7 @@ func TestFireDisableRaceInterleavings(t *testing.T) {
 
 	for i := range 50 {
 		now := time.Now()
-		job, err := st.AddJob(ctx, repeat.JobSpec{
+		job, err := st.AddJob(ctx, reloop.JobSpec{
 			Name: fmt.Sprintf("racy-%d", i), Command: []string{"true"}, FireAt: now.Add(time.Hour),
 		}, now)
 		if err != nil {
@@ -248,7 +248,7 @@ func TestFireDisableRaceInterleavings(t *testing.T) {
 				t.Fatalf("iteration %d: ran but deadline %s not cleared", i, after.NextFireAt)
 			}
 		case 0:
-			if !after.NextFireAt.Equal(job.NextFireAt) || after.Status != repeat.StatusDisabled {
+			if !after.NextFireAt.Equal(job.NextFireAt) || after.Status != reloop.StatusDisabled {
 				t.Fatalf("iteration %d: no run, but status=%s next=%s; want disabled with the original deadline",
 					i, after.Status, after.NextFireAt)
 			}
@@ -270,7 +270,7 @@ func TestSchedulerFiresCronJob(t *testing.T) {
 	defer cancel()
 
 	now := time.Now()
-	if _, err := st.AddJob(ctx, repeat.JobSpec{
+	if _, err := st.AddJob(ctx, reloop.JobSpec{
 		Name: "tick", Command: []string{"true"}, Cron: "@every 1s",
 	}, now); err != nil {
 		t.Fatalf("AddJob: %v", err)
@@ -296,7 +296,7 @@ func TestSchedulerSkipsOverlap(t *testing.T) {
 	defer cancel()
 
 	now := time.Now()
-	job, err := st.AddJob(ctx, repeat.JobSpec{
+	job, err := st.AddJob(ctx, reloop.JobSpec{
 		Name: "slow", Command: []string{"true"}, Cron: "@every 1s",
 	}, now)
 	if err != nil {
@@ -321,7 +321,7 @@ func TestSchedulerSkipsOverlap(t *testing.T) {
 	}
 	var overlaps int
 	for _, r := range runs {
-		if r.Status == repeat.RunSkippedOverlap {
+		if r.Status == reloop.RunSkippedOverlap {
 			overlaps++
 		}
 	}
@@ -341,7 +341,7 @@ func TestSchedulerHonoursDisabled(t *testing.T) {
 	defer cancel()
 
 	now := time.Now()
-	job, err := st.AddJob(ctx, repeat.JobSpec{
+	job, err := st.AddJob(ctx, reloop.JobSpec{
 		Name: "off", Command: []string{"true"}, Cron: "@every 1s",
 	}, now)
 	if err != nil {
@@ -378,7 +378,7 @@ func TestSchedulerWakePicksUpNewJob(t *testing.T) {
 	sleep(100 * time.Millisecond)
 
 	now := time.Now()
-	if _, err := st.AddJob(ctx, repeat.JobSpec{
+	if _, err := st.AddJob(ctx, reloop.JobSpec{
 		Name: "late", Command: []string{"true"}, Cron: "@every 1s",
 	}, now); err != nil {
 		t.Fatalf("AddJob: %v", err)
@@ -396,7 +396,7 @@ func TestSchedulerWakePicksUpNewJob(t *testing.T) {
 func TestSchedulerNextSleepUsesConfiguredClock(t *testing.T) {
 	st := newStore(t)
 	fakeNow := time.Date(2040, 5, 13, 10, 0, 0, 0, time.UTC)
-	if _, err := st.AddJob(t.Context(), repeat.JobSpec{
+	if _, err := st.AddJob(t.Context(), reloop.JobSpec{
 		Name: "future", Command: []string{"true"}, FireAt: fakeNow.Add(250 * time.Millisecond),
 	}, fakeNow); err != nil {
 		t.Fatalf("AddJob: %v", err)
@@ -427,7 +427,7 @@ func TestSchedulerOneshotClaimDoesNotOverlapWhileRunning(t *testing.T) {
 	defer cancel(nil)
 
 	now := time.Now()
-	job, err := st.AddJob(ctx, repeat.JobSpec{
+	job, err := st.AddJob(ctx, reloop.JobSpec{
 		Name: "once-slow", Command: []string{"true"}, FireAt: now.Add(20 * time.Millisecond),
 	}, now)
 	if err != nil {
@@ -447,7 +447,7 @@ func TestSchedulerOneshotClaimDoesNotOverlapWhileRunning(t *testing.T) {
 		t.Fatalf("ListRunsAfter: %v", err)
 	}
 	for _, run := range runs {
-		if run.Status == repeat.RunSkippedOverlap {
+		if run.Status == reloop.RunSkippedOverlap {
 			t.Errorf("oneshot recorded overlap while first run was still active: %+v", runs)
 		}
 	}
@@ -474,7 +474,7 @@ func TestSchedulerMissedOneshotFiresOnStartup(t *testing.T) {
 	// a fire time one hour ago. Insert with the historical now so the
 	// fire time is valid at add time and past at scheduler startup.
 	addedAt := time.Now().Add(-2 * time.Hour)
-	if _, err := st.AddJob(ctx, repeat.JobSpec{
+	if _, err := st.AddJob(ctx, reloop.JobSpec{
 		Name: "missed", Command: []string{"true"}, FireAt: addedAt.Add(1 * time.Hour),
 	}, addedAt); err != nil {
 		t.Fatalf("AddJob: %v", err)
@@ -499,7 +499,7 @@ func TestSchedulerRecoversInterruptedOneshotOnStartup(t *testing.T) {
 	defer cancel()
 
 	addedAt := time.Now().Add(-time.Hour)
-	job, err := st.AddJob(ctx, repeat.JobSpec{
+	job, err := st.AddJob(ctx, reloop.JobSpec{
 		Name: "orphan", Command: []string{"true"}, FireAt: addedAt.Add(time.Minute),
 	}, addedAt)
 	if err != nil {
@@ -514,7 +514,7 @@ func TestSchedulerRecoversInterruptedOneshotOnStartup(t *testing.T) {
 
 	if !waitFor(1500*time.Millisecond, func() bool {
 		got, err := st.Job(ctx, job.ID)
-		return err == nil && got.Status == repeat.StatusDone
+		return err == nil && got.Status == reloop.StatusDone
 	}) {
 		t.Fatalf("interrupted oneshot was not recovered to done")
 	}
@@ -522,14 +522,14 @@ func TestSchedulerRecoversInterruptedOneshotOnStartup(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Job: %v", err)
 	}
-	if got.LastStatus != repeat.RunInterrupted {
-		t.Errorf("last status = %s, want %s", got.LastStatus, repeat.RunInterrupted)
+	if got.LastStatus != reloop.RunInterrupted {
+		t.Errorf("last status = %s, want %s", got.LastStatus, reloop.RunInterrupted)
 	}
 	run, err := st.LatestRun(ctx, job.ID)
 	if err != nil {
 		t.Fatalf("LatestRun: %v", err)
 	}
-	if run.Status != repeat.RunInterrupted || run.FinishedAt.IsZero() {
+	if run.Status != reloop.RunInterrupted || run.FinishedAt.IsZero() {
 		t.Errorf("recovered record = %+v, want closed as interrupted", run)
 	}
 	if calls := rr.calls.Load(); calls != 0 {
@@ -553,12 +553,12 @@ func TestSchedulerLeavesDueJobWhenSaturated(t *testing.T) {
 	defer cancel()
 
 	now := time.Now()
-	if _, err := st.AddJob(ctx, repeat.JobSpec{
+	if _, err := st.AddJob(ctx, reloop.JobSpec{
 		Name: "holder", Command: []string{"true"}, FireAt: now.Add(10 * time.Millisecond),
 	}, now); err != nil {
 		t.Fatalf("AddJob holder: %v", err)
 	}
-	starved, err := st.AddJob(ctx, repeat.JobSpec{
+	starved, err := st.AddJob(ctx, reloop.JobSpec{
 		Name: "starved", Command: []string{"true"}, FireAt: now.Add(50 * time.Millisecond),
 	}, now)
 	if err != nil {
@@ -578,7 +578,7 @@ func TestSchedulerLeavesDueJobWhenSaturated(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Job: %v", err)
 	}
-	if got.NextFireAt.IsZero() || got.Status != repeat.StatusEnabled {
+	if got.NextFireAt.IsZero() || got.Status != reloop.StatusEnabled {
 		t.Fatalf("starved job: status=%s next=%s, want enabled with its deadline intact",
 			got.Status, got.NextFireAt)
 	}
@@ -590,7 +590,7 @@ func TestSchedulerLeavesDueJobWhenSaturated(t *testing.T) {
 	close(gate)
 	if !waitFor(2*time.Second, func() bool {
 		got, err := st.Job(ctx, starved.ID)
-		return err == nil && got.Status == repeat.StatusDone
+		return err == nil && got.Status == reloop.StatusDone
 	}) {
 		t.Fatal("starved occurrence did not run after a slot freed")
 	}
@@ -610,7 +610,7 @@ func TestSchedulerOneshotMarksDone(t *testing.T) {
 	defer cancel()
 
 	now := time.Now()
-	job, err := st.AddJob(ctx, repeat.JobSpec{
+	job, err := st.AddJob(ctx, reloop.JobSpec{
 		Name: "once", Command: []string{"true"}, FireAt: now.Add(200 * time.Millisecond),
 	}, now)
 	if err != nil {
@@ -624,7 +624,7 @@ func TestSchedulerOneshotMarksDone(t *testing.T) {
 	}
 	if !waitFor(500*time.Millisecond, func() bool {
 		got, err := st.Job(ctx, job.ID)
-		return err == nil && got.Status == repeat.StatusDone
+		return err == nil && got.Status == reloop.StatusDone
 	}) {
 		t.Fatalf("oneshot not marked done")
 	}
@@ -641,7 +641,7 @@ func TestSchedulerCapsLargeOutput(t *testing.T) {
 	defer cancel()
 
 	now := time.Now()
-	job, err := st.AddJob(ctx, repeat.JobSpec{
+	job, err := st.AddJob(ctx, reloop.JobSpec{
 		Name:    "fat",
 		Command: []string{"/bin/sh", "-c", "yes A | head -c 200000"},
 		FireAt:  now.Add(200 * time.Millisecond),
@@ -689,7 +689,7 @@ func TestSchedulerRecordsRunDespiteCancel(t *testing.T) {
 	gate := make(chan struct{})
 	rr := &recRunner{wait: gate}
 
-	job, err := st.AddJob(t.Context(), repeat.JobSpec{
+	job, err := st.AddJob(t.Context(), reloop.JobSpec{
 		Name: "long", Command: []string{"true"}, Cron: "@every 1s",
 	}, now)
 	if err != nil {
@@ -729,7 +729,7 @@ func TestSchedulerGCRunsPeriodically(t *testing.T) {
 	now := time.Now()
 
 	// Cron that won't fire during the test window.
-	job, err := st.AddJob(t.Context(), repeat.JobSpec{
+	job, err := st.AddJob(t.Context(), reloop.JobSpec{
 		Name: "c", Command: []string{"true"}, Cron: "0 0 1 1 *",
 	}, now)
 	if err != nil {
@@ -759,7 +759,7 @@ func TestSchedulerGCRunsPeriodically(t *testing.T) {
 	if err != nil || !ran {
 		t.Fatalf("Claim = (run=%v, %v), want a claimed run", ran, err)
 	}
-	if err := st.Finish(t.Context(), runID, job.ID, 0, repeat.RunOK, nil, ancient.Add(time.Second)); err != nil {
+	if err := st.Finish(t.Context(), runID, job.ID, 0, reloop.RunOK, nil, ancient.Add(time.Second)); err != nil {
 		t.Fatalf("Finish: %v", err)
 	}
 
@@ -776,10 +776,10 @@ func TestSchedulerGCRunsPeriodically(t *testing.T) {
 }
 
 // timeScale scales every real-clock wait in these tests. Default 1x.
-// Set REPEAT_TEST_TIME_MULTIPLIER to widen margins on slow CI. Resolved
+// Set RELOOP_TEST_TIME_MULTIPLIER to widen margins on slow CI. Resolved
 // once, so there is no mutable package state.
 var timeScale = sync.OnceValue(func() time.Duration {
-	n, err := strconv.Atoi(os.Getenv("REPEAT_TEST_TIME_MULTIPLIER"))
+	n, err := strconv.Atoi(os.Getenv("RELOOP_TEST_TIME_MULTIPLIER"))
 	if err != nil || n < 1 {
 		n = 1
 	}
@@ -827,7 +827,7 @@ func TestStartReturnsWhenCancelled(t *testing.T) {
 // failure must skip the job, not run it or crash the loop.
 func TestFireWarnsWhenClaimFails(t *testing.T) {
 	st := newStore(t)
-	job, err := st.AddJob(t.Context(), repeat.JobSpec{
+	job, err := st.AddJob(t.Context(), reloop.JobSpec{
 		Name: "doomed", Command: []string{"x"}, Cron: "@every 1s",
 	}, time.Now())
 	if err != nil {
@@ -859,7 +859,7 @@ func TestNextSleepRetriesSoonOnStoreError(t *testing.T) {
 // TestNextSleepClampsImminentDeadline checks the busy-spin floor.
 func TestNextSleepClampsImminentDeadline(t *testing.T) {
 	st := newStore(t)
-	job, err := st.AddJob(t.Context(), repeat.JobSpec{
+	job, err := st.AddJob(t.Context(), reloop.JobSpec{
 		Name: "soon", Command: []string{"x"}, FireAt: time.Now().Add(time.Hour),
 	}, time.Now())
 	if err != nil {
@@ -878,7 +878,7 @@ func TestNextSleepClampsImminentDeadline(t *testing.T) {
 func TestRunJobDropsRecordWhenJobDeletedMidRun(t *testing.T) {
 	st := newStore(t)
 	ctx := t.Context()
-	job, err := st.AddJob(ctx, repeat.JobSpec{
+	job, err := st.AddJob(ctx, reloop.JobSpec{
 		Name: "vanishing", Command: []string{"x"}, Cron: "@every 1s",
 	}, time.Now())
 	if err != nil {
@@ -906,7 +906,7 @@ func TestRunJobDropsRecordWhenJobDeletedMidRun(t *testing.T) {
 func TestRunJobLogsWhenFinishFails(t *testing.T) {
 	st := newStore(t)
 	ctx := t.Context()
-	job, err := st.AddJob(ctx, repeat.JobSpec{
+	job, err := st.AddJob(ctx, reloop.JobSpec{
 		Name: "stranded", Command: []string{"x"}, Cron: "@every 1s",
 	}, time.Now())
 	if err != nil {

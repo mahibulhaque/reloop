@@ -9,12 +9,12 @@ import (
 	"time"
 
 	"github.com/google/go-cmp/cmp"
-	"github.com/mahibulhaque/repeat/internal/repeat"
+	"github.com/mahibulhaque/reloop/internal/reloop"
 )
 
 // mustClaim drives job through the same claim transaction production
 // uses: deadline cleared (one-shot form), running row opened.
-func mustClaim(t *testing.T, r *Store, job repeat.Job, now time.Time) int64 {
+func mustClaim(t *testing.T, r *Store, job reloop.Job, now time.Time) int64 {
 	t.Helper()
 	runID, run, err := r.Claim(t.Context(), job.ID, job.NextFireAt, time.Time{}, now, 100)
 	if err != nil || !run {
@@ -24,9 +24,9 @@ func mustClaim(t *testing.T, r *Store, job repeat.Job, now time.Time) int64 {
 }
 
 // mustFinish closes a claimed run as ok through the production path.
-func mustFinish(t *testing.T, r *Store, runID int64, id repeat.JobID, now time.Time) {
+func mustFinish(t *testing.T, r *Store, runID int64, id reloop.JobID, now time.Time) {
 	t.Helper()
-	if err := r.Finish(t.Context(), runID, id, 0, repeat.RunOK, nil, now); err != nil {
+	if err := r.Finish(t.Context(), runID, id, 0, reloop.RunOK, nil, now); err != nil {
 		t.Fatalf("Finish(%s): %v", id, err)
 	}
 }
@@ -39,7 +39,7 @@ func TestClaim(t *testing.T) {
 	ctx := t.Context()
 	now := mustTime(t, "2026-05-13T10:00:00Z")
 
-	job, err := r.AddJob(ctx, repeat.JobSpec{Name: "c", Command: []string{"x"}, Cron: "@hourly"}, now)
+	job, err := r.AddJob(ctx, reloop.JobSpec{Name: "c", Command: []string{"x"}, Cron: "@hourly"}, now)
 	if err != nil {
 		t.Fatalf("AddJob: %v", err)
 	}
@@ -79,11 +79,11 @@ func TestClaimRefusesWhenSaturated(t *testing.T) {
 	ctx := t.Context()
 	now := mustTime(t, "2026-05-13T10:00:00Z")
 
-	holder, err := r.AddJob(ctx, repeat.JobSpec{Name: "holder", Command: []string{"x"}, FireAt: now.Add(time.Hour)}, now)
+	holder, err := r.AddJob(ctx, reloop.JobSpec{Name: "holder", Command: []string{"x"}, FireAt: now.Add(time.Hour)}, now)
 	if err != nil {
 		t.Fatalf("AddJob holder: %v", err)
 	}
-	starved, err := r.AddJob(ctx, repeat.JobSpec{Name: "starved", Command: []string{"x"}, FireAt: now.Add(time.Hour)}, now)
+	starved, err := r.AddJob(ctx, reloop.JobSpec{Name: "starved", Command: []string{"x"}, FireAt: now.Add(time.Hour)}, now)
 	if err != nil {
 		t.Fatalf("AddJob starved: %v", err)
 	}
@@ -99,7 +99,7 @@ func TestClaimRefusesWhenSaturated(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Job: %v", err)
 	}
-	if !got.NextFireAt.Equal(starved.NextFireAt) || got.Status != repeat.StatusEnabled {
+	if !got.NextFireAt.Equal(starved.NextFireAt) || got.Status != reloop.StatusEnabled {
 		t.Errorf("starved job: status=%s next=%s, want enabled with its deadline intact",
 			got.Status, got.NextFireAt)
 	}
@@ -122,7 +122,7 @@ func TestClaimRecordsOverlap(t *testing.T) {
 	ctx := t.Context()
 	now := mustTime(t, "2026-05-13T10:00:00Z")
 
-	job, err := r.AddJob(ctx, repeat.JobSpec{Name: "c", Command: []string{"echo"}, Cron: "@hourly"}, now)
+	job, err := r.AddJob(ctx, reloop.JobSpec{Name: "c", Command: []string{"echo"}, Cron: "@hourly"}, now)
 	if err != nil {
 		t.Fatalf("AddJob: %v", err)
 	}
@@ -138,7 +138,7 @@ func TestClaimRecordsOverlap(t *testing.T) {
 	}
 
 	runs := listRuns(t, r, job.ID)
-	if diff := cmp.Diff([]repeat.RunStatus{repeat.RunSkippedOverlap, repeat.RunRunning}, runStatuses(runs)); diff != "" {
+	if diff := cmp.Diff([]reloop.RunStatus{reloop.RunSkippedOverlap, reloop.RunRunning}, runStatuses(runs)); diff != "" {
 		t.Errorf("run statuses mismatch (-want +got):\n%s", diff)
 	}
 	got, err := r.Job(ctx, job.ID)
@@ -159,7 +159,7 @@ func TestStoreRunLifecycleAndLog(t *testing.T) {
 	ctx := t.Context()
 	now := mustTime(t, "2026-05-13T10:00:00Z")
 
-	job, err := r.AddJob(ctx, repeat.JobSpec{Name: "c", Command: []string{"echo"}, Cron: "@hourly"}, now)
+	job, err := r.AddJob(ctx, reloop.JobSpec{Name: "c", Command: []string{"echo"}, Cron: "@hourly"}, now)
 	if err != nil {
 		t.Fatalf("AddJob: %v", err)
 	}
@@ -176,10 +176,10 @@ func TestStoreRunLifecycleAndLog(t *testing.T) {
 	if err != nil {
 		t.Fatalf("OpenRun mid-run: %v", err)
 	}
-	if open.ID != runID || open.Status != repeat.RunRunning || !open.FinishedAt.IsZero() {
+	if open.ID != runID || open.Status != reloop.RunRunning || !open.FinishedAt.IsZero() {
 		t.Errorf("mid-run row = %+v, want open running row %d", open, runID)
 	}
-	if _, err := r.LatestRun(ctx, job.ID); !errors.Is(err, repeat.ErrNotFound) {
+	if _, err := r.LatestRun(ctx, job.ID); !errors.Is(err, reloop.ErrNotFound) {
 		t.Errorf("LatestRun mid-run = %v, want ErrNotFound while only an open row exists", err)
 	}
 	mid, err := r.Job(ctx, job.ID)
@@ -191,7 +191,7 @@ func TestStoreRunLifecycleAndLog(t *testing.T) {
 	}
 
 	finishedAt := now.Add(time.Second)
-	if err := r.Finish(ctx, runID, job.ID, 0, repeat.RunOK, []byte("hello\n"), finishedAt); err != nil {
+	if err := r.Finish(ctx, runID, job.ID, 0, reloop.RunOK, []byte("hello\n"), finishedAt); err != nil {
 		t.Fatalf("Finish: %v", err)
 	}
 
@@ -199,14 +199,14 @@ func TestStoreRunLifecycleAndLog(t *testing.T) {
 	if err != nil {
 		t.Fatalf("LatestRun: %v", err)
 	}
-	if latest.Status != repeat.RunOK || latest.ExitCode != 0 || !latest.FinishedAt.Equal(finishedAt) {
+	if latest.Status != reloop.RunOK || latest.ExitCode != 0 || !latest.FinishedAt.Equal(finishedAt) {
 		t.Errorf("LatestRun = %+v, want ok/0 finished at %s", latest, finishedAt)
 	}
 	got, err := r.Job(ctx, job.ID)
 	if err != nil {
 		t.Fatalf("Job: %v", err)
 	}
-	if got.LastStatus != repeat.RunOK || !got.LastRunAt.Equal(finishedAt) || got.Status != repeat.StatusEnabled {
+	if got.LastStatus != reloop.RunOK || !got.LastRunAt.Equal(finishedAt) || got.Status != reloop.StatusEnabled {
 		t.Errorf("job summary = last=%s at=%s status=%s, want ok/%s/enabled",
 			got.LastStatus, got.LastRunAt, got.Status, finishedAt)
 	}
@@ -228,7 +228,7 @@ func TestFinishAfterDeleteIsNotFound(t *testing.T) {
 	ctx := t.Context()
 	now := mustTime(t, "2026-05-13T10:00:00Z")
 
-	job, err := r.AddJob(ctx, repeat.JobSpec{Name: "victim", Command: []string{"x"}, FireAt: now.Add(time.Hour)}, now)
+	job, err := r.AddJob(ctx, reloop.JobSpec{Name: "victim", Command: []string{"x"}, FireAt: now.Add(time.Hour)}, now)
 	if err != nil {
 		t.Fatalf("AddJob: %v", err)
 	}
@@ -236,8 +236,8 @@ func TestFinishAfterDeleteIsNotFound(t *testing.T) {
 	if err := r.DeleteJob(ctx, job.ID); err != nil {
 		t.Fatalf("DeleteJob: %v", err)
 	}
-	err = r.Finish(ctx, runID, job.ID, 0, repeat.RunOK, []byte("out"), now.Add(time.Second))
-	if !errors.Is(err, repeat.ErrNotFound) {
+	err = r.Finish(ctx, runID, job.ID, 0, reloop.RunOK, []byte("out"), now.Add(time.Second))
+	if !errors.Is(err, reloop.ErrNotFound) {
 		t.Fatalf("Finish after delete = %v, want errors.Is(ErrNotFound)", err)
 	}
 }
@@ -253,15 +253,15 @@ func TestRecoverClosesRunningRecords(t *testing.T) {
 	now := mustTime(t, "2026-05-13T10:00:00Z")
 	future := now.Add(time.Hour)
 
-	cron, err := r.AddJob(ctx, repeat.JobSpec{Name: "cron", Command: []string{"x"}, Cron: "@hourly"}, now)
+	cron, err := r.AddJob(ctx, reloop.JobSpec{Name: "cron", Command: []string{"x"}, Cron: "@hourly"}, now)
 	if err != nil {
 		t.Fatalf("AddJob cron: %v", err)
 	}
-	pending, err := r.AddJob(ctx, repeat.JobSpec{Name: "pending", Command: []string{"x"}, FireAt: future}, now)
+	pending, err := r.AddJob(ctx, reloop.JobSpec{Name: "pending", Command: []string{"x"}, FireAt: future}, now)
 	if err != nil {
 		t.Fatalf("AddJob pending: %v", err)
 	}
-	oneshot, err := r.AddJob(ctx, repeat.JobSpec{Name: "oneshot", Command: []string{"x"}, FireAt: future}, now)
+	oneshot, err := r.AddJob(ctx, reloop.JobSpec{Name: "oneshot", Command: []string{"x"}, FireAt: future}, now)
 	if err != nil {
 		t.Fatalf("AddJob oneshot: %v", err)
 	}
@@ -285,14 +285,14 @@ func TestRecoverClosesRunningRecords(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Job oneshot: %v", err)
 	}
-	if got.Status != repeat.StatusDone || got.LastStatus != repeat.RunInterrupted {
+	if got.Status != reloop.StatusDone || got.LastStatus != reloop.RunInterrupted {
 		t.Errorf("oneshot after recover: status=%s last=%s, want done/interrupted", got.Status, got.LastStatus)
 	}
 	run, err := r.LatestRun(ctx, oneshot.ID)
 	if err != nil {
 		t.Fatalf("LatestRun oneshot: %v", err)
 	}
-	if run.Status != repeat.RunInterrupted || run.ExitCode != -1 || run.FinishedAt.IsZero() {
+	if run.Status != reloop.RunInterrupted || run.ExitCode != -1 || run.FinishedAt.IsZero() {
 		t.Errorf("recovered run = %+v, want closed interrupted/-1", run)
 	}
 
@@ -302,12 +302,12 @@ func TestRecoverClosesRunningRecords(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Job cron: %v", err)
 	}
-	if got.Status != repeat.StatusEnabled || !got.NextFireAt.Equal(cronNext) || got.LastStatus != repeat.RunInterrupted {
+	if got.Status != reloop.StatusEnabled || !got.NextFireAt.Equal(cronNext) || got.LastStatus != reloop.RunInterrupted {
 		t.Errorf("cron after recover: status=%s next=%s last=%s, want enabled/%s/interrupted",
 			got.Status, got.NextFireAt, got.LastStatus, cronNext)
 	}
 
-	if got, err := r.Job(ctx, pending.ID); err != nil || got.Status != repeat.StatusEnabled {
+	if got, err := r.Job(ctx, pending.ID); err != nil || got.Status != reloop.StatusEnabled {
 		t.Errorf("pending job after recover: %+v err=%v, want still enabled", got, err)
 	}
 
@@ -326,7 +326,7 @@ func TestRecoverDisabledClaimedOneshot(t *testing.T) {
 	ctx := t.Context()
 	now := mustTime(t, "2026-05-13T10:00:00Z")
 
-	job, err := r.AddJob(ctx, repeat.JobSpec{Name: "j", Command: []string{"x"}, FireAt: now.Add(time.Hour)}, now)
+	job, err := r.AddJob(ctx, reloop.JobSpec{Name: "j", Command: []string{"x"}, FireAt: now.Add(time.Hour)}, now)
 	if err != nil {
 		t.Fatalf("AddJob: %v", err)
 	}
@@ -342,13 +342,13 @@ func TestRecoverDisabledClaimedOneshot(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Job: %v", err)
 	}
-	if got.Status != repeat.StatusDone || got.LastStatus != repeat.RunInterrupted {
+	if got.Status != reloop.StatusDone || got.LastStatus != reloop.RunInterrupted {
 		t.Errorf("after recover: status=%s last=%s, want done/interrupted", got.Status, got.LastStatus)
 	}
 }
 
-func runStatuses(runs []repeat.Run) []repeat.RunStatus {
-	statuses := make([]repeat.RunStatus, 0, len(runs))
+func runStatuses(runs []reloop.Run) []reloop.RunStatus {
+	statuses := make([]reloop.RunStatus, 0, len(runs))
 	for _, run := range runs {
 		statuses = append(statuses, run.Status)
 	}

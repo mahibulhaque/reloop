@@ -9,9 +9,9 @@ import (
 // systemd ExecStart tokens, & breaks plist XML, and % is a systemd
 // specifier.
 func TestRenderLaunchdPlistEscapes(t *testing.T) {
-	got := renderLaunchdPlist("/Users/a&b/my tools/repeat", "/data <dir>", []string{"--data-dir", "/data <dir>"})
+	got := renderLaunchdPlist("/Users/a&b/my tools/reloop", "/data <dir>", []string{"--data-dir", "/data <dir>"})
 	for _, want := range []string{
-		"<string>/Users/a&amp;b/my tools/repeat</string>",
+		"<string>/Users/a&amp;b/my tools/reloop</string>",
 		"<string>--data-dir</string>",
 		"<string>/data &lt;dir&gt;</string>",
 		"<key>SuccessfulExit</key><false/>",
@@ -26,10 +26,10 @@ func TestRenderLaunchdPlistEscapes(t *testing.T) {
 }
 
 func TestRenderSystemdUnitQuotes(t *testing.T) {
-	got := renderSystemdUnit("/home/a b/repeat 100%", "/data 100%", []string{"--data-dir", "/data 100%"})
+	got := renderSystemdUnit("/home/a b/reloop 100%", "/data 100%", []string{"--data-dir", "/data 100%"})
 	for _, want := range []string{
-		`ExecStart="/home/a b/repeat 100%%" daemon "--data-dir" "/data 100%%"`,
-		"StandardOutput=append:/data 100%%/repeat.log",
+		`ExecStart="/home/a b/reloop 100%%" daemon "--data-dir" "/data 100%%"`,
+		"StandardOutput=append:/data 100%%/reloop.log",
 		"Restart=on-failure",
 	} {
 		if !strings.Contains(got, want) {
@@ -41,7 +41,7 @@ func TestRenderSystemdUnitQuotes(t *testing.T) {
 func TestRenderSystemdUnitEscapesDollar(t *testing.T) {
 	// systemd substitutes $VAR even inside quoted ExecStart tokens. A
 	// literal $ must render as $$ or the daemon serves the wrong path.
-	got := renderSystemdUnit("/opt/repeat", "/data/x${HOME}y", []string{"--data-dir", "/data/x${HOME}y"})
+	got := renderSystemdUnit("/opt/reloop", "/data/x${HOME}y", []string{"--data-dir", "/data/x${HOME}y"})
 	if !strings.Contains(got, `"/data/x$${HOME}y"`) {
 		t.Errorf("unit leaves $ unescaped:\n%s", got)
 	}

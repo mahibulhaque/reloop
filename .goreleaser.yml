@@ -1,11 +1,11 @@
 version: 2
 
-project_name: repeat
+project_name: reloop
 
 builds:
-  - id: repeat
-    main: ./cmd/repeat
-    binary: repeat
+  - id: reloop
+    main: ./cmd/reloop
+    binary: reloop
     env:
       - CGO_ENABLED=0
     flags:
@@ -61,17 +61,17 @@ release:
   prerelease: auto
   mode: replace
 
-# Auto-update Casks/repeat.rb in this same repo after each release.
+# Auto-update Casks/reloop.rb in this same repo after each release.
 # Requires `contents: write` on GITHUB_TOKEN; the release workflow
 # already grants it. Casks replaced the deprecated `brews` formulas;
 # goreleaser check fails the CI on the old key.
 homebrew_casks:
   - repository:
       owner: mahibulhaque
-      name: repeat
+      name: reloop
       branch: main
     directory: Casks
-    homepage: https://github.com/mahibulhaque/repeat
+    homepage: https://github.com/mahibulhaque/reloop
     description: Cron and one-shot job scheduler that runs in-process
     commit_author:
       name: mahibulhaque
@@ -83,5 +83,5 @@ homebrew_casks:
       post:
         install: |
           if system_command("/usr/bin/xattr", args: ["-h"]).exit_status == 0
-            system_command "/usr/bin/xattr", args: ["-dr", "com.apple.quarantine", "#{staged_path}/repeat"]
+            system_command "/usr/bin/xattr", args: ["-dr", "com.apple.quarantine", "#{staged_path}/reloop"]
           end

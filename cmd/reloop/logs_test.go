@@ -10,13 +10,13 @@ import (
 	"testing"
 	"time"
 
-	"github.com/mahibulhaque/repeat/internal/repeat"
-	"github.com/mahibulhaque/repeat/internal/store"
+	"github.com/mahibulhaque/reloop/internal/reloop"
+	"github.com/mahibulhaque/reloop/internal/store"
 )
 
 // seedRun records one finished run through the real state machine:
 // claim at started, finish at the same instant with output.
-func seedRun(t *testing.T, st *store.Store, jobID repeat.JobID, started time.Time, output string) int64 {
+func seedRun(t *testing.T, st *store.Store, jobID reloop.JobID, started time.Time, output string) int64 {
 	t.Helper()
 	job, err := st.Job(t.Context(), jobID)
 	if err != nil {
@@ -26,7 +26,7 @@ func seedRun(t *testing.T, st *store.Store, jobID repeat.JobID, started time.Tim
 	if err != nil || !ran {
 		t.Fatalf("Claim = (run=%v, %v), want a claimed run", ran, err)
 	}
-	if err := st.Finish(t.Context(), runID, jobID, 0, repeat.RunOK, []byte(output), started); err != nil {
+	if err := st.Finish(t.Context(), runID, jobID, 0, reloop.RunOK, []byte(output), started); err != nil {
 		t.Fatalf("Finish: %v", err)
 	}
 	return runID
@@ -36,7 +36,7 @@ func TestStreamLogsFollowEmitsEveryRunBetweenPolls(t *testing.T) {
 	st := newStore(t)
 
 	now := time.Now()
-	job, err := st.AddJob(t.Context(), repeat.JobSpec{
+	job, err := st.AddJob(t.Context(), reloop.JobSpec{
 		Name: "fast", Command: []string{"true"}, Cron: "@every 1s",
 	}, now)
 	if err != nil {
@@ -84,7 +84,7 @@ func TestStreamLogsFollowShowsHistoryWhileRunOpen(t *testing.T) {
 	st := newStore(t)
 
 	now := time.Now()
-	job, err := st.AddJob(t.Context(), repeat.JobSpec{
+	job, err := st.AddJob(t.Context(), reloop.JobSpec{
 		Name: "busy", Command: []string{"true"}, Cron: "@hourly",
 	}, now)
 	if err != nil {
@@ -119,7 +119,7 @@ func TestStreamLogsFollowShowsHistoryWhileRunOpen(t *testing.T) {
 		t.Errorf("follow output = %q, leaked open run #%d", out.String(), openID)
 	}
 
-	if err := st.Finish(t.Context(), openID, job.ID, 0, repeat.RunOK, []byte("fresh\n"), now.Add(time.Second)); err != nil {
+	if err := st.Finish(t.Context(), openID, job.ID, 0, reloop.RunOK, []byte("fresh\n"), now.Add(time.Second)); err != nil {
 		t.Fatalf("Finish: %v", err)
 	}
 	if !waitForCmdTest(5*time.Second, func() bool {
@@ -143,7 +143,7 @@ func TestStreamLogsFollowDoesNotLeapfrogOpenRun(t *testing.T) {
 	st := newStore(t)
 
 	now := time.Now()
-	job, err := st.AddJob(t.Context(), repeat.JobSpec{
+	job, err := st.AddJob(t.Context(), reloop.JobSpec{
 		Name: "slow", Command: []string{"true"}, Cron: "@hourly",
 	}, now)
 	if err != nil {
@@ -174,7 +174,7 @@ func TestStreamLogsFollowDoesNotLeapfrogOpenRun(t *testing.T) {
 		t.Errorf("follow output while run open = %q, want empty", got)
 	}
 
-	if err := st.Finish(t.Context(), runID, job.ID, 0, repeat.RunOK, []byte("late\n"), now.Add(time.Minute)); err != nil {
+	if err := st.Finish(t.Context(), runID, job.ID, 0, reloop.RunOK, []byte("late\n"), now.Add(time.Minute)); err != nil {
 		t.Fatalf("Finish: %v", err)
 	}
 	if !waitForCmdTest(5*time.Second, func() bool {
@@ -275,7 +275,7 @@ func TestEmitRunOutputMissingRun(t *testing.T) {
 func TestStreamLogsSinceParksBehindOpenRun(t *testing.T) {
 	st := newStore(t)
 	now := time.Now()
-	job, err := st.AddJob(t.Context(), repeat.JobSpec{
+	job, err := st.AddJob(t.Context(), reloop.JobSpec{
 		Name: "parked", Command: []string{"true"}, Cron: "@hourly",
 	}, now)
 	if err != nil {
@@ -327,7 +327,7 @@ func TestStreamLogsSinceStoreError(t *testing.T) {
 // parks at zero and streams nothing until a run lands.
 func TestStreamLogsFollowStartsEmpty(t *testing.T) {
 	st := newStore(t)
-	job, err := st.AddJob(t.Context(), repeat.JobSpec{
+	job, err := st.AddJob(t.Context(), reloop.JobSpec{
 		Name: "silent", Command: []string{"true"}, Cron: "@hourly",
 	}, time.Now())
 	if err != nil {
@@ -352,7 +352,7 @@ func TestStreamLogsFollowStartsEmpty(t *testing.T) {
 func TestStreamLogsSurfacesWriteErrors(t *testing.T) {
 	st := newStore(t)
 	now := time.Now()
-	job, err := st.AddJob(t.Context(), repeat.JobSpec{
+	job, err := st.AddJob(t.Context(), reloop.JobSpec{
 		Name: "brokenpipe", Command: []string{"true"}, Cron: "@hourly",
 	}, now)
 	if err != nil {
@@ -386,7 +386,7 @@ func TestStreamLogsSurfacesWriteErrors(t *testing.T) {
 func TestStreamLogsFollowLoopSurfacesWriteError(t *testing.T) {
 	st := newStore(t)
 	now := time.Now()
-	job, err := st.AddJob(t.Context(), repeat.JobSpec{
+	job, err := st.AddJob(t.Context(), reloop.JobSpec{
 		Name: "midflight", Command: []string{"true"}, Cron: "@hourly",
 	}, now)
 	if err != nil {

@@ -13,7 +13,7 @@ import (
 	"time"
 
 	"github.com/google/go-cmp/cmp"
-	"github.com/mahibulhaque/repeat/internal/repeat"
+	"github.com/mahibulhaque/reloop/internal/reloop"
 )
 
 func newStore(t *testing.T) *Store {
@@ -37,7 +37,7 @@ func mustTime(t *testing.T, s string) time.Time {
 
 // insertRun seeds one finished run row directly. Production rows go
 // through Claim and Finish. Tests need arbitrary timestamps.
-func insertRun(t *testing.T, r *Store, jobID repeat.JobID, started, finished time.Time) int64 {
+func insertRun(t *testing.T, r *Store, jobID reloop.JobID, started, finished time.Time) int64 {
 	t.Helper()
 	const q = `
 		INSERT INTO runs (job_id, started_at, finished_at, exit_code, status, output)
@@ -54,7 +54,7 @@ func insertRun(t *testing.T, r *Store, jobID repeat.JobID, started, finished tim
 }
 
 // listRuns returns every run for jobID, newest first.
-func listRuns(t *testing.T, r *Store, jobID repeat.JobID) []repeat.Run {
+func listRuns(t *testing.T, r *Store, jobID reloop.JobID) []reloop.Run {
 	t.Helper()
 	const q = `
 		SELECT id, job_id, started_at, finished_at, exit_code, status
@@ -66,7 +66,7 @@ func listRuns(t *testing.T, r *Store, jobID repeat.JobID) []repeat.Run {
 		t.Fatalf("list runs: %v", err)
 	}
 	defer rows.Close()
-	runs := make([]repeat.Run, 0)
+	runs := make([]reloop.Run, 0)
 	for rows.Next() {
 		run, err := scanRun(rows)
 		if err != nil {
@@ -98,7 +98,7 @@ func TestOpenStampsSchemaVersion(t *testing.T) {
 // recreated, never migrated and never misread.
 func TestOpenRecreatesLegacyDatabase(t *testing.T) {
 	dir := t.TempDir()
-	raw, err := sql.Open("sqlite", "file:"+filepath.Join(dir, "repeat.db"))
+	raw, err := sql.Open("sqlite", "file:"+filepath.Join(dir, "reloop.db"))
 	if err != nil {
 		t.Fatalf("open raw: %v", err)
 	}
@@ -120,7 +120,7 @@ func TestOpenRecreatesLegacyDatabase(t *testing.T) {
 	}
 	t.Cleanup(func() { _ = st.Close() })
 
-	if _, err := st.Job(t.Context(), "AAAAA"); !errors.Is(err, repeat.ErrNotFound) {
+	if _, err := st.Job(t.Context(), "AAAAA"); !errors.Is(err, reloop.ErrNotFound) {
 		t.Errorf("legacy job survived recreation: err=%v, want ErrNotFound", err)
 	}
 	var v int
@@ -137,7 +137,7 @@ func TestOpenRecreatesLegacyDatabase(t *testing.T) {
 // rather than half-read.
 func TestOpenRecreatesMismatchedVersion(t *testing.T) {
 	dir := t.TempDir()
-	raw, err := sql.Open("sqlite", "file:"+filepath.Join(dir, "repeat.db"))
+	raw, err := sql.Open("sqlite", "file:"+filepath.Join(dir, "reloop.db"))
 	if err != nil {
 		t.Fatalf("open raw: %v", err)
 	}
@@ -179,7 +179,7 @@ func TestOpenHealsMissingIndex(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Open: %v", err)
 	}
-	job, err := st.AddJob(t.Context(), repeat.JobSpec{
+	job, err := st.AddJob(t.Context(), reloop.JobSpec{
 		Name: "keep", Command: []string{"true"}, Cron: "@hourly",
 	}, mustTime(t, "2026-05-13T10:00:00Z"))
 	if err != nil {
@@ -216,7 +216,7 @@ func TestOpenHealsMissingIndex(t *testing.T) {
 // would discard the schedule.
 func TestOpenRejectsCorruptDatabase(t *testing.T) {
 	dir := t.TempDir()
-	if err := os.WriteFile(filepath.Join(dir, "repeat.db"), []byte("this is not a database"), 0o600); err != nil {
+	if err := os.WriteFile(filepath.Join(dir, "reloop.db"), []byte("this is not a database"), 0o600); err != nil {
 		t.Fatalf("setup: %v", err)
 	}
 
@@ -252,12 +252,12 @@ func TestStoreJobRoundtrip(t *testing.T) {
 	ctx := t.Context()
 	now := mustTime(t, "2026-05-13T10:00:00Z")
 
-	spec := repeat.JobSpec{Name: "ping", Command: []string{"echo", "hi"}, Cron: "@hourly"}
+	spec := reloop.JobSpec{Name: "ping", Command: []string{"echo", "hi"}, Cron: "@hourly"}
 	got, err := r.AddJob(ctx, spec, now)
 	if err != nil {
 		t.Fatalf("AddJob: %v", err)
 	}
-	if got.ID == "" || got.Kind != repeat.KindCron || got.Status != repeat.StatusEnabled {
+	if got.ID == "" || got.Kind != reloop.KindCron || got.Status != reloop.StatusEnabled {
 		t.Errorf("AddJob returned %+v", got)
 	}
 	if diff := cmp.Diff([]string{"echo", "hi"}, got.Command); diff != "" {
@@ -275,7 +275,7 @@ func TestStoreJobRoundtrip(t *testing.T) {
 	if err := r.DeleteJob(ctx, got.ID); err != nil {
 		t.Fatalf("DeleteJob: %v", err)
 	}
-	if _, err := r.Job(ctx, got.ID); !errors.Is(err, repeat.ErrNotFound) {
+	if _, err := r.Job(ctx, got.ID); !errors.Is(err, reloop.ErrNotFound) {
 		t.Errorf("Job(after delete) = %v, want ErrNotFound", err)
 	}
 }
@@ -292,7 +292,7 @@ func TestStoreListJobsOrder(t *testing.T) {
 
 	for i, name := range []string{"oldest", "middle", "newest"} {
 		when := base.Add(time.Duration(i) * time.Minute)
-		if _, err := r.AddJob(ctx, repeat.JobSpec{
+		if _, err := r.AddJob(ctx, reloop.JobSpec{
 			Name: name, Command: []string{"echo"}, Cron: "@hourly",
 		}, when); err != nil {
 			t.Fatalf("AddJob %q: %v", name, err)
@@ -317,11 +317,11 @@ func TestStoreListFilters(t *testing.T) {
 	now := mustTime(t, "2026-05-13T10:00:00Z")
 	future := now.Add(time.Hour)
 
-	_, err := r.AddJob(ctx, repeat.JobSpec{Name: "c1", Command: []string{"echo"}, Cron: "@hourly"}, now)
+	_, err := r.AddJob(ctx, reloop.JobSpec{Name: "c1", Command: []string{"echo"}, Cron: "@hourly"}, now)
 	if err != nil {
 		t.Fatalf("AddJob c1: %v", err)
 	}
-	one, err := r.AddJob(ctx, repeat.JobSpec{Name: "o1", Command: []string{"echo"}, FireAt: future}, now)
+	one, err := r.AddJob(ctx, reloop.JobSpec{Name: "o1", Command: []string{"echo"}, FireAt: future}, now)
 	if err != nil {
 		t.Fatalf("AddJob o1: %v", err)
 	}
@@ -336,14 +336,14 @@ func TestStoreListFilters(t *testing.T) {
 	if len(all) != 2 {
 		t.Errorf("ListJobs all returned %d jobs, want 2", len(all))
 	}
-	cronOnly, err := r.ListJobs(ctx, ListOpts{Kind: repeat.KindCron})
+	cronOnly, err := r.ListJobs(ctx, ListOpts{Kind: reloop.KindCron})
 	if err != nil {
 		t.Fatalf("ListJobs cron: %v", err)
 	}
 	if diff := cmp.Diff([]string{"c1"}, jobNames(cronOnly)); diff != "" {
 		t.Errorf("ListJobs cron names mismatch (-want +got):\n%s", diff)
 	}
-	enabledOnly, err := r.ListJobs(ctx, ListOpts{Status: repeat.StatusEnabled})
+	enabledOnly, err := r.ListJobs(ctx, ListOpts{Status: reloop.StatusEnabled})
 	if err != nil {
 		t.Fatalf("ListJobs enabled: %v", err)
 	}
@@ -359,7 +359,7 @@ func TestListJobsOffsetWithoutLimit(t *testing.T) {
 	ctx := t.Context()
 	now := mustTime(t, "2026-05-13T10:00:00Z")
 	for i, name := range []string{"a", "b", "c"} {
-		if _, err := r.AddJob(ctx, repeat.JobSpec{Name: name, Command: []string{"x"}, Cron: "@hourly"},
+		if _, err := r.AddJob(ctx, reloop.JobSpec{Name: name, Command: []string{"x"}, Cron: "@hourly"},
 			now.Add(time.Duration(i)*time.Second)); err != nil {
 			t.Fatalf("AddJob %s: %v", name, err)
 		}
@@ -380,7 +380,7 @@ func TestDisableJobSkipsDone(t *testing.T) {
 	r := newStore(t)
 	now := mustTime(t, "2026-01-02T10:00:00Z")
 
-	job, err := r.AddJob(t.Context(), repeat.JobSpec{
+	job, err := r.AddJob(t.Context(), reloop.JobSpec{
 		Name: "ran", Command: []string{"true"}, FireAt: now.Add(time.Minute),
 	}, now)
 	if err != nil {
@@ -389,14 +389,14 @@ func TestDisableJobSkipsDone(t *testing.T) {
 	mustFinish(t, r, mustClaim(t, r, job, now.Add(time.Minute)), job.ID, now.Add(2*time.Minute))
 
 	err = r.DisableJob(t.Context(), job.ID, now.Add(3*time.Minute))
-	if !errors.Is(err, repeat.ErrConflict) {
+	if !errors.Is(err, reloop.ErrConflict) {
 		t.Fatalf("DisableJob(done) = %v, want errors.Is(ErrConflict)", err)
 	}
 	got, err := r.Job(t.Context(), job.ID)
 	if err != nil {
 		t.Fatalf("Job: %v", err)
 	}
-	if got.Status != repeat.StatusDone {
+	if got.Status != reloop.StatusDone {
 		t.Errorf("status = %s, want done to stay done", got.Status)
 	}
 }
@@ -409,7 +409,7 @@ func TestStoreDueJobsRespectsStatus(t *testing.T) {
 	ctx := t.Context()
 	now := mustTime(t, "2026-05-13T10:00:00Z")
 
-	j, err := r.AddJob(ctx, repeat.JobSpec{
+	j, err := r.AddJob(ctx, reloop.JobSpec{
 		Name: "j", Command: []string{"true"}, Cron: "@hourly",
 	}, now)
 	if err != nil {
@@ -451,7 +451,7 @@ func TestStoreNextFireAtInvariant(t *testing.T) {
 	now := mustTime(t, "2026-05-13T10:00:00Z")
 
 	// AddJob computes next_fire_at on insert.
-	cron, err := r.AddJob(ctx, repeat.JobSpec{
+	cron, err := r.AddJob(ctx, reloop.JobSpec{
 		Name: "c", Command: []string{"true"}, Cron: "@hourly",
 	}, now)
 	if err != nil {
@@ -464,7 +464,7 @@ func TestStoreNextFireAtInvariant(t *testing.T) {
 		t.Errorf("next_fire_at = %v, want > now (%v)", cron.NextFireAt, now)
 	}
 
-	one, err := r.AddJob(ctx, repeat.JobSpec{
+	one, err := r.AddJob(ctx, reloop.JobSpec{
 		Name: "o", Command: []string{"true"}, FireAt: now.Add(time.Hour),
 	}, now)
 	if err != nil {
@@ -512,7 +512,7 @@ func TestStoreNextFireAtInvariant(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Job oneshot: %v", err)
 	}
-	if !got.NextFireAt.IsZero() || got.Status != repeat.StatusDone {
+	if !got.NextFireAt.IsZero() || got.Status != reloop.StatusDone {
 		t.Errorf("finished one-shot: next=%v status=%s, want zero/done", got.NextFireAt, got.Status)
 	}
 
@@ -531,7 +531,7 @@ func TestStoreListRunsSince(t *testing.T) {
 	ctx := t.Context()
 	now := mustTime(t, "2026-05-13T10:00:00Z")
 
-	job, err := r.AddJob(ctx, repeat.JobSpec{Name: "c", Command: []string{"x"}, Cron: "@hourly"}, now)
+	job, err := r.AddJob(ctx, reloop.JobSpec{Name: "c", Command: []string{"x"}, Cron: "@hourly"}, now)
 	if err != nil {
 		t.Fatalf("AddJob: %v", err)
 	}
@@ -564,7 +564,7 @@ func TestStoreListRunsAfter(t *testing.T) {
 	ctx := t.Context()
 	now := mustTime(t, "2026-05-13T10:00:00Z")
 
-	job, err := r.AddJob(ctx, repeat.JobSpec{Name: "c", Command: []string{"x"}, Cron: "@hourly"}, now)
+	job, err := r.AddJob(ctx, reloop.JobSpec{Name: "c", Command: []string{"x"}, Cron: "@hourly"}, now)
 	if err != nil {
 		t.Fatalf("AddJob: %v", err)
 	}
@@ -586,7 +586,7 @@ func TestStoreGCEnforcesRetention(t *testing.T) {
 	ctx := t.Context()
 	now := mustTime(t, "2026-05-13T10:00:00Z")
 
-	job, err := r.AddJob(ctx, repeat.JobSpec{Name: "c", Command: []string{"echo"}, Cron: "@hourly"}, now)
+	job, err := r.AddJob(ctx, reloop.JobSpec{Name: "c", Command: []string{"echo"}, Cron: "@hourly"}, now)
 	if err != nil {
 		t.Fatalf("AddJob: %v", err)
 	}
@@ -625,16 +625,16 @@ func TestStoreGCEnforcesGlobalCap(t *testing.T) {
 	// Two jobs, three runs each, spaced so global ordering by started_at
 	// is unambiguous. With perJob=10 and maxAge huge, only the global cap
 	// should trim. Cap of 4 drops the 2 oldest.
-	jobA, err := r.AddJob(ctx, repeat.JobSpec{Name: "a", Command: []string{"x"}, Cron: "@hourly"}, now)
+	jobA, err := r.AddJob(ctx, reloop.JobSpec{Name: "a", Command: []string{"x"}, Cron: "@hourly"}, now)
 	if err != nil {
 		t.Fatalf("AddJob a: %v", err)
 	}
-	jobB, err := r.AddJob(ctx, repeat.JobSpec{Name: "b", Command: []string{"x"}, Cron: "@hourly"}, now)
+	jobB, err := r.AddJob(ctx, reloop.JobSpec{Name: "b", Command: []string{"x"}, Cron: "@hourly"}, now)
 	if err != nil {
 		t.Fatalf("AddJob b: %v", err)
 	}
 	type rec struct {
-		job repeat.JobID
+		job reloop.JobID
 		t   time.Time
 	}
 	recs := []rec{
@@ -678,7 +678,7 @@ func TestStoreGCKeepsNewestRunsWhenTimestampsTie(t *testing.T) {
 	ctx := t.Context()
 	now := mustTime(t, "2026-05-13T10:00:00Z")
 
-	job, err := r.AddJob(ctx, repeat.JobSpec{Name: "ties", Command: []string{"x"}, Cron: "@hourly"}, now)
+	job, err := r.AddJob(ctx, reloop.JobSpec{Name: "ties", Command: []string{"x"}, Cron: "@hourly"}, now)
 	if err != nil {
 		t.Fatalf("AddJob: %v", err)
 	}
@@ -706,7 +706,7 @@ func TestGCKeepsRunningRecords(t *testing.T) {
 	ctx := t.Context()
 	now := mustTime(t, "2026-05-13T10:00:00Z")
 
-	job, err := r.AddJob(ctx, repeat.JobSpec{Name: "slow", Command: []string{"x"}, Cron: "@hourly"}, now)
+	job, err := r.AddJob(ctx, reloop.JobSpec{Name: "slow", Command: []string{"x"}, Cron: "@hourly"}, now)
 	if err != nil {
 		t.Fatalf("AddJob: %v", err)
 	}
@@ -725,7 +725,7 @@ func TestGCKeepsRunningRecords(t *testing.T) {
 	runs := listRuns(t, r, job.ID)
 	var stillRunning bool
 	for _, got := range runs {
-		if got.ID == runID && got.Status == repeat.RunRunning {
+		if got.ID == runID && got.Status == reloop.RunRunning {
 			stillRunning = true
 		}
 	}
@@ -733,7 +733,7 @@ func TestGCKeepsRunningRecords(t *testing.T) {
 		t.Fatalf("GC trimmed the open running row; runs=%+v", runs)
 	}
 	// Finishing it must still work.
-	if err := r.Finish(ctx, runID, job.ID, 0, repeat.RunOK, nil, now.Add(time.Minute)); err != nil {
+	if err := r.Finish(ctx, runID, job.ID, 0, reloop.RunOK, nil, now.Add(time.Minute)); err != nil {
 		t.Fatalf("Finish after GC: %v", err)
 	}
 }
@@ -744,21 +744,21 @@ func TestStoreCounts(t *testing.T) {
 	now := mustTime(t, "2026-05-13T10:00:00Z")
 	future := now.Add(time.Hour)
 
-	if _, err := r.AddJob(ctx, repeat.JobSpec{Name: "c1", Command: []string{"x"}, Cron: "@hourly"}, now); err != nil {
+	if _, err := r.AddJob(ctx, reloop.JobSpec{Name: "c1", Command: []string{"x"}, Cron: "@hourly"}, now); err != nil {
 		t.Fatalf("AddJob c1: %v", err)
 	}
-	if _, err := r.AddJob(ctx, repeat.JobSpec{Name: "c2", Command: []string{"x"}, Cron: "@daily"}, now); err != nil {
+	if _, err := r.AddJob(ctx, reloop.JobSpec{Name: "c2", Command: []string{"x"}, Cron: "@daily"}, now); err != nil {
 		t.Fatalf("AddJob c2: %v", err)
 	}
-	if _, err := r.AddJob(ctx, repeat.JobSpec{Name: "o1", Command: []string{"x"}, FireAt: future}, now); err != nil {
+	if _, err := r.AddJob(ctx, reloop.JobSpec{Name: "o1", Command: []string{"x"}, FireAt: future}, now); err != nil {
 		t.Fatalf("AddJob o1: %v", err)
 	}
-	o2, err := r.AddJob(ctx, repeat.JobSpec{Name: "o2", Command: []string{"x"}, FireAt: future}, now)
+	o2, err := r.AddJob(ctx, reloop.JobSpec{Name: "o2", Command: []string{"x"}, FireAt: future}, now)
 	if err != nil {
 		t.Fatalf("AddJob o2: %v", err)
 	}
 	mustFinish(t, r, mustClaim(t, r, o2, now), o2.ID, now)
-	c3, err := r.AddJob(ctx, repeat.JobSpec{Name: "c3", Command: []string{"x"}, Cron: "@daily"}, now)
+	c3, err := r.AddJob(ctx, reloop.JobSpec{Name: "c3", Command: []string{"x"}, Cron: "@daily"}, now)
 	if err != nil {
 		t.Fatalf("AddJob c3: %v", err)
 	}
@@ -770,7 +770,7 @@ func TestStoreCounts(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Counts: %v", err)
 	}
-	want := repeat.JobCounts{Total: 5, Cron: 3, CronDisabled: 1, OneshotPending: 1, OneshotDone: 1}
+	want := reloop.JobCounts{Total: 5, Cron: 3, CronDisabled: 1, OneshotPending: 1, OneshotDone: 1}
 	if diff := cmp.Diff(want, c); diff != "" {
 		t.Errorf("Counts() mismatch (-want +got):\n%s", diff)
 	}
@@ -785,26 +785,26 @@ func TestStoreCountsPartitionsOneshots(t *testing.T) {
 	now := mustTime(t, "2026-05-13T10:00:00Z")
 	future := now.Add(time.Hour)
 
-	if _, err := r.AddJob(ctx, repeat.JobSpec{Name: "cron", Command: []string{"x"}, Cron: "@hourly"}, now); err != nil {
+	if _, err := r.AddJob(ctx, reloop.JobSpec{Name: "cron", Command: []string{"x"}, Cron: "@hourly"}, now); err != nil {
 		t.Fatalf("AddJob cron: %v", err)
 	}
-	if _, err := r.AddJob(ctx, repeat.JobSpec{Name: "pending", Command: []string{"x"}, FireAt: future}, now); err != nil {
+	if _, err := r.AddJob(ctx, reloop.JobSpec{Name: "pending", Command: []string{"x"}, FireAt: future}, now); err != nil {
 		t.Fatalf("AddJob pending: %v", err)
 	}
-	done, err := r.AddJob(ctx, repeat.JobSpec{Name: "done", Command: []string{"x"}, FireAt: future}, now)
+	done, err := r.AddJob(ctx, reloop.JobSpec{Name: "done", Command: []string{"x"}, FireAt: future}, now)
 	if err != nil {
 		t.Fatalf("AddJob done: %v", err)
 	}
 	mustFinish(t, r, mustClaim(t, r, done, now), done.ID, now)
 	// Claimed: next_fire_at cleared by the scheduler, not yet finished.
-	claimed, err := r.AddJob(ctx, repeat.JobSpec{Name: "claimed", Command: []string{"x"}, FireAt: future}, now)
+	claimed, err := r.AddJob(ctx, reloop.JobSpec{Name: "claimed", Command: []string{"x"}, FireAt: future}, now)
 	if err != nil {
 		t.Fatalf("AddJob claimed: %v", err)
 	}
 	mustClaim(t, r, claimed, now)
 	// Disabled mid-run: still in flight, not in the disabled bucket.
 	// Disabling does not stop a running command.
-	midRun, err := r.AddJob(ctx, repeat.JobSpec{Name: "mid-run", Command: []string{"x"}, FireAt: future}, now)
+	midRun, err := r.AddJob(ctx, reloop.JobSpec{Name: "mid-run", Command: []string{"x"}, FireAt: future}, now)
 	if err != nil {
 		t.Fatalf("AddJob mid-run: %v", err)
 	}
@@ -813,7 +813,7 @@ func TestStoreCountsPartitionsOneshots(t *testing.T) {
 		t.Fatalf("DisableJob mid-run: %v", err)
 	}
 	// Disabled before firing: the disabled bucket.
-	parked, err := r.AddJob(ctx, repeat.JobSpec{Name: "parked", Command: []string{"x"}, FireAt: future}, now)
+	parked, err := r.AddJob(ctx, reloop.JobSpec{Name: "parked", Command: []string{"x"}, FireAt: future}, now)
 	if err != nil {
 		t.Fatalf("AddJob parked: %v", err)
 	}
@@ -825,7 +825,7 @@ func TestStoreCountsPartitionsOneshots(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Counts: %v", err)
 	}
-	want := repeat.JobCounts{
+	want := reloop.JobCounts{
 		Total: 6, Cron: 1,
 		OneshotPending: 1, OneshotDone: 1, OneshotDisabled: 1, OneshotInFlight: 2,
 	}
@@ -834,7 +834,7 @@ func TestStoreCountsPartitionsOneshots(t *testing.T) {
 	}
 }
 
-func jobNames(jobs []repeat.Job) []string {
+func jobNames(jobs []reloop.Job) []string {
 	names := make([]string, 0, len(jobs))
 	for _, job := range jobs {
 		names = append(names, job.Name)
@@ -842,7 +842,7 @@ func jobNames(jobs []repeat.Job) []string {
 	return names
 }
 
-func runIDs(runs []repeat.Run) []int64 {
+func runIDs(runs []reloop.Run) []int64 {
 	ids := make([]int64, 0, len(runs))
 	for _, run := range runs {
 		ids = append(ids, run.ID)

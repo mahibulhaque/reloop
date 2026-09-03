@@ -19,10 +19,10 @@ import (
 	"time"
 )
 
-// DataDir returns the per-user directory for repeat state.
+// DataDir returns the per-user directory for reloop state.
 //
-//   - macOS: ~/Library/Application Support/repeat
-//   - Linux/other: $XDG_DATA_HOME/repeat, falling back to ~/.local/share/repeat
+//   - macOS: ~/Library/Application Support/reloop
+//   - Linux/other: $XDG_DATA_HOME/reloop, falling back to ~/.local/share/reloop
 //
 // It does not create the directory.
 func DataDir() (string, error) {
@@ -31,16 +31,16 @@ func DataDir() (string, error) {
 		if err != nil {
 			return "", err
 		}
-		return filepath.Join(home, "Library", "Application Support", "repeat"), nil
+		return filepath.Join(home, "Library", "Application Support", "reloop"), nil
 	}
 	if x := os.Getenv("XDG_DATA_HOME"); x != "" {
-		return filepath.Join(x, "repeat"), nil
+		return filepath.Join(x, "reloop"), nil
 	}
 	home, err := homeDir()
 	if err != nil {
 		return "", err
 	}
-	return filepath.Join(home, ".local", "share", "repeat"), nil
+	return filepath.Join(home, ".local", "share", "reloop"), nil
 }
 
 // homeDir wraps os.UserHomeDir with the package's error text.
@@ -52,13 +52,13 @@ func homeDir() (string, error) {
 	return home, nil
 }
 
-func lockPath(dataDir string) string { return filepath.Join(dataDir, "repeat.lock") }
-func logPath(dataDir string) string  { return filepath.Join(dataDir, "repeat.log") }
+func lockPath(dataDir string) string { return filepath.Join(dataDir, "reloop.lock") }
+func logPath(dataDir string) string  { return filepath.Join(dataDir, "reloop.log") }
 
 // AcquireRunLock takes the daemon-lifetime exclusive lock.
 //
 // Behavior:
-//   - It creates $dataDir/repeat.lock if needed.
+//   - It creates $dataDir/reloop.lock if needed.
 //   - It writes pid and start time into the file.
 //   - The release closure unlocks and closes the file.
 //   - The OS releases the flock if the process exits.

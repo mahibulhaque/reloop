@@ -5,7 +5,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/mahibulhaque/repeat/internal/repeat"
+	"github.com/mahibulhaque/reloop/internal/reloop"
 )
 
 // TestWriteStatusInFlightLine: claimed-but-unfinished one-shots render
@@ -24,9 +24,9 @@ func TestWriteStatusInFlightLine(t *testing.T) {
 	for name, tc := range cases {
 		t.Run(name, func(t *testing.T) {
 			var buf bytes.Buffer
-			writeStatus(&buf, repeat.Status{
-				Daemon: repeat.DaemonStatus{Running: tc.running},
-				Jobs:   repeat.JobCounts{Total: 3, OneshotInFlight: tc.inFlight},
+			writeStatus(&buf, reloop.Status{
+				Daemon: reloop.DaemonStatus{Running: tc.running},
+				Jobs:   reloop.JobCounts{Total: 3, OneshotInFlight: tc.inFlight},
 			})
 			out := buf.String()
 			if tc.want == "" {
@@ -46,8 +46,8 @@ func TestWriteStatusInFlightLine(t *testing.T) {
 // nonzero, so the jobs line stays short in the all-enabled case.
 func TestWriteStatusDisabledCounts(t *testing.T) {
 	var buf bytes.Buffer
-	writeStatus(&buf, repeat.Status{
-		Jobs: repeat.JobCounts{Total: 5, Cron: 3, CronDisabled: 1, OneshotPending: 1, OneshotDisabled: 1},
+	writeStatus(&buf, reloop.Status{
+		Jobs: reloop.JobCounts{Total: 5, Cron: 3, CronDisabled: 1, OneshotPending: 1, OneshotDisabled: 1},
 	})
 	out := buf.String()
 	for _, want := range []string{"cron=3 (1 disabled)", "oneshot disabled=1"} {
@@ -57,7 +57,7 @@ func TestWriteStatusDisabledCounts(t *testing.T) {
 	}
 
 	buf.Reset()
-	writeStatus(&buf, repeat.Status{Jobs: repeat.JobCounts{Total: 2, Cron: 1, OneshotPending: 1}})
+	writeStatus(&buf, reloop.Status{Jobs: reloop.JobCounts{Total: 2, Cron: 1, OneshotPending: 1}})
 	if strings.Contains(buf.String(), "disabled") {
 		t.Errorf("zero disabled counts printed a disabled segment:\n%s", buf.String())
 	}
@@ -91,7 +91,7 @@ func TestTruncate(t *testing.T) {
 }
 
 func TestScheduleSummaryUnknownKind(t *testing.T) {
-	if got := scheduleSummary(repeat.Job{Kind: "weird"}); got != "" {
+	if got := scheduleSummary(reloop.Job{Kind: "weird"}); got != "" {
 		t.Errorf("scheduleSummary = %q, want empty for an unknown kind", got)
 	}
 }

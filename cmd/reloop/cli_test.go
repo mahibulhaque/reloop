@@ -12,7 +12,7 @@ import (
 
 	"github.com/charmbracelet/fang"
 	"github.com/google/go-cmp/cmp"
-	"github.com/mahibulhaque/repeat/internal/repeat"
+	"github.com/mahibulhaque/reloop/internal/reloop"
 )
 
 // runCmd executes the root command with the given argv. It returns
@@ -56,16 +56,16 @@ func TestCLIAddListShowRm(t *testing.T) {
 	if err != nil {
 		t.Fatalf("ls: %v", err)
 	}
-	var jobs []repeat.Job
+	var jobs []reloop.Job
 	if err := json.Unmarshal([]byte(out), &jobs); err != nil {
 		t.Fatalf("ls --json: %v\n%s", err, out)
 	}
 	wantRows := []cliJobRow{{
 		Name:    "backup",
-		Kind:    repeat.KindCron,
+		Kind:    reloop.KindCron,
 		Command: []string{"echo", "hi"},
 		Cron:    "@hourly",
-		Status:  repeat.StatusEnabled,
+		Status:  reloop.StatusEnabled,
 	}}
 	if diff := cmp.Diff(wantRows, cliJobRows(jobs)); diff != "" {
 		t.Errorf("ls --json rows mismatch (-want +got):\n%s", diff)
@@ -84,7 +84,7 @@ func TestCLIAddListShowRm(t *testing.T) {
 		if err != nil {
 			t.Fatalf("show %q: %v", ref, err)
 		}
-		var got repeat.Job
+		var got reloop.Job
 		if err := json.Unmarshal([]byte(out), &got); err != nil {
 			t.Fatalf("show %q --json: %v\n%s", ref, err, out)
 		}
@@ -104,13 +104,13 @@ func TestCLIAddListShowRm(t *testing.T) {
 
 type cliJobRow struct {
 	Name    string
-	Kind    repeat.JobKind
+	Kind    reloop.JobKind
 	Command []string
 	Cron    string
-	Status  repeat.JobStatus
+	Status  reloop.JobStatus
 }
 
-func cliJobRows(jobs []repeat.Job) []cliJobRow {
+func cliJobRows(jobs []reloop.Job) []cliJobRow {
 	rows := make([]cliJobRow, 0, len(jobs))
 	for _, job := range jobs {
 		rows = append(rows, cliJobRow{
@@ -142,7 +142,7 @@ func TestInjectedVersionWinsOverFangBuildInfo(t *testing.T) {
 	if err := fang.Execute(t.Context(), root, fangOptions()...); err != nil {
 		t.Fatalf("version: %v\nstderr: %s", err, errBuf.String())
 	}
-	if got := outBuf.String(); !strings.Contains(got, "repeat version 1.2.3") {
+	if got := outBuf.String(); !strings.Contains(got, "reloop version 1.2.3") {
 		t.Fatalf("--version output = %q", got)
 	}
 }
@@ -233,7 +233,7 @@ func fakeHome(t *testing.T) {
 
 // With no launchctl or systemctl on PATH, the install error must
 // tell the user to run the daemon directly. This is a Go test
-// because the script tests resolve the repeat command through PATH.
+// because the script tests resolve the reloop command through PATH.
 func TestInstallWithoutSupervisorTools(t *testing.T) {
 	fakeHome(t)
 	t.Setenv("PATH", t.TempDir())

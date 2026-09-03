@@ -3,7 +3,7 @@ package main
 import (
 	"fmt"
 
-	"github.com/mahibulhaque/repeat/internal/store"
+	"github.com/mahibulhaque/reloop/internal/store"
 	"github.com/spf13/cobra"
 )
 
@@ -25,11 +25,11 @@ func newListCmd() *cobra.Command {
 at 100 rows by default; pass --all to disable the cap, or --limit/--offset
 to page through. With --json the result is an array of job objects
 suitable for jq/awk pipelines; truncation is reported on stderr.`,
-		Example: `  repeat ls
-  repeat ls --status enabled --json
-  repeat ls --kind oneshot
-  repeat ls --all
-  repeat ls --limit 20 --offset 40`,
+		Example: `  reloop ls
+  reloop ls --status enabled --json
+  reloop ls --kind oneshot
+  reloop ls --all
+  reloop ls --limit 20 --offset 40`,
 		Args: cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			// Validate all input before openService: a rejected

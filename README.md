@@ -1,9 +1,9 @@
-# repeat
+# reloop
 
 A cron and one-shot job scheduler.
 
-[![ci](https://img.shields.io/github/actions/workflow/status/mahibulhaque/repeat/ci.yml?branch=main&label=ci&style=for-the-badge)](https://github.com/mahibulhaque/repeat/actions/workflows/ci.yml)
-[![coverage](https://img.shields.io/endpoint?url=https%3A%2F%2Fraw.githubusercontent.com%2Fmahibulhaque%2Frepeat%2Fbadges%2Fcoverage.json&style=for-the-badge)](https://github.com/mahibulhaque/repeat/actions/workflows/ci.yml)
+[![ci](https://img.shields.io/github/actions/workflow/status/mahibulhaque/reloop/ci.yml?branch=main&label=ci&style=for-the-badge)](https://github.com/mahibulhaque/reloop/actions/workflows/ci.yml)
+[![coverage](https://img.shields.io/endpoint?url=https%3A%2F%2Fraw.githubusercontent.com%2Fmahibulhaque%2Freloop%2Fbadges%2Fcoverage.json&style=for-the-badge)](https://github.com/mahibulhaque/reloop/actions/workflows/ci.yml)
 
 It does two things:
 
@@ -35,33 +35,33 @@ that behaves the same on macOS and Linux.
 macOS:
 
 ```sh
-brew tap mahibulhaque/repeat https://github.com/mahibulhaque/repeat
+brew tap mahibulhaque/reloop https://github.com/mahibulhaque/reloop
 # Newer Homebrew requires trusting third-party taps.
-brew trust mahibulhaque/repeat
-brew install --cask repeat
+brew trust mahibulhaque/reloop
+brew install --cask reloop
 ```
 
 Linux:
 
 ```sh
-curl -fsSL https://raw.githubusercontent.com/mahibulhaque/repeat/main/install.sh | sh
+curl -fsSL https://raw.githubusercontent.com/mahibulhaque/reloop/main/install.sh | sh
 ```
 
 From source:
 
 ```sh
-go install github.com/mahibulhaque/repeat/cmd/repeat@latest
+go install github.com/mahibulhaque/reloop/cmd/reloop@latest
 ```
 
 On systems without launchd or systemd (Alpine, WSL, containers),
-skip `repeat install` and run the daemon in a loop:
+skip `reloop install` and run the daemon in a loop:
 
 ```sh
-mkdir -p ~/.local/share/repeat
-nohup sh -c 'until repeat daemon; do sleep 1; done' >> ~/.local/share/repeat/repeat.log 2>&1 &
+mkdir -p ~/.local/share/reloop
+nohup sh -c 'until reloop daemon; do sleep 1; done' >> ~/.local/share/reloop/reloop.log 2>&1 &
 ```
 
-The loop restarts the daemon after a crash. `repeat stop` stops the
+The loop restarts the daemon after a crash. `reloop stop` stops the
 daemon and ends the loop.
 
 A restart loses nothing. The schedule lives in SQLite. A missed
@@ -79,71 +79,71 @@ logins and crashes:
 
 ```sh
 # Register the supervisor unit once.
-repeat install
+reloop install
 ```
 
-Add recurring jobs. Everything after `--` is the command repeat will run:
+Add recurring jobs. Everything after `--` is the command reloop will run:
 
 ```sh
 # Record weekday disk space.
-repeat add --cron '0 9 * * 1-5' --name disk-space -- sh -c 'date; df -h "$HOME"'
+reloop add --cron '0 9 * * 1-5' --name disk-space -- sh -c 'date; df -h "$HOME"'
 
 # Check a website every 15 minutes.
-repeat add --cron '*/15 * * * *' --name homepage-check -- curl -fsS https://example.com
+reloop add --cron '*/15 * * * *' --name homepage-check -- curl -fsS https://example.com
 ```
 
 Add one-shot jobs:
 
 ```sh
 # Run after a relative delay.
-repeat add --at '+30m' --name stretch -- sh -c 'printf "stand up and stretch\n"'
+reloop add --at '+30m' --name stretch -- sh -c 'printf "stand up and stretch\n"'
 
 # Run at a wall-clock time.
-repeat add --at 'tomorrow 9am' --name morning-note -- sh -c 'printf "review calendar\n"'
+reloop add --at 'tomorrow 9am' --name morning-note -- sh -c 'printf "review calendar\n"'
 ```
 
 List and inspect:
 
 ```sh
 # List jobs in a compact table.
-repeat ls
+reloop ls
 
 # Emit JSON for scripts.
-repeat ls --json
+reloop ls --json
 
 # Show one job's schedule and state.
-repeat show disk-space
+reloop show disk-space
 
 # Read captured output after a run has completed.
-repeat logs disk-space --lines 50
+reloop logs disk-space --lines 50
 
 # Stream future completed runs.
-repeat logs disk-space --follow
+reloop logs disk-space --follow
 
 # Check daemon state, supervisor state, and job counts.
-repeat status
+reloop status
 ```
 
 Control the lifecycle:
 
 ```sh
 # Pause a job without deleting it.
-repeat disable disk-space
+reloop disable disk-space
 
 # Re-enable it.
-repeat enable disk-space
+reloop enable disk-space
 
 # Delete a job and its run history.
-repeat rm stretch
+reloop rm stretch
 
 # Ask the daemon to exit.
-repeat stop
+reloop stop
 
 # Purge done one-shots and disabled jobs.
-repeat prune
+reloop prune
 
 # Remove the supervisor unit.
-repeat uninstall
+reloop uninstall
 ```
 
 ## Development

@@ -14,8 +14,8 @@ import (
 	"sync"
 	"time"
 
-	"github.com/mahibulhaque/repeat/internal/repeat"
-	"github.com/mahibulhaque/repeat/internal/store"
+	"github.com/mahibulhaque/reloop/internal/reloop"
+	"github.com/mahibulhaque/reloop/internal/store"
 )
 
 // errRecordTimedOut is the cause used when run recording exceeds
@@ -159,12 +159,12 @@ func (s *Scheduler) Start(ctx context.Context) {
 //  2. If the claim says no, do nothing. A job skipped at full
 //     capacity stays due and a later pass retries it.
 //  3. Otherwise run it in the background and record the result.
-func (s *Scheduler) fire(ctx context.Context, now time.Time, job repeat.Job) {
+func (s *Scheduler) fire(ctx context.Context, now time.Time, job reloop.Job) {
 	// A fired one-shot never fires again, so only crons get a next
 	// deadline.
 	var next time.Time
-	if job.Kind == repeat.KindCron {
-		next = repeat.NextFire(job, now)
+	if job.Kind == reloop.KindCron {
+		next = reloop.NextFire(job, now)
 		if next.IsZero() {
 			// A cron with no computable next fire must not be claimed.
 			// Claiming it with a zero deadline would mark it done at
@@ -222,13 +222,13 @@ func (s *Scheduler) nextSleep(ctx context.Context, now time.Time) time.Duration 
 // runJob executes one claimed job and records the result.
 // The claim already advanced the deadline, so a crash mid-run never
 // replays the fire. Recover closes the row as interrupted instead.
-func (s *Scheduler) runJob(ctx context.Context, runID int64, job repeat.Job) {
+func (s *Scheduler) runJob(ctx context.Context, runID int64, job reloop.Job) {
 	buf := newCappedBuf(store.MaxOutputBytes)
 	exitCode, runErr := s.cfg.runner.Run(ctx, job, buf)
 
-	outcome := repeat.RunOK
+	outcome := reloop.RunOK
 	if runErr != nil || exitCode != 0 {
-		outcome = repeat.RunFail
+		outcome = reloop.RunFail
 	}
 
 	// This write ignores shutdown cancellation because a killed run
@@ -242,7 +242,7 @@ func (s *Scheduler) runJob(ctx context.Context, runID int64, job repeat.Job) {
 	if err == nil {
 		return
 	}
-	if errors.Is(err, repeat.ErrNotFound) {
+	if errors.Is(err, reloop.ErrNotFound) {
 		// The job was deleted while it ran. Deleting a job drops its
 		// history too, so dropping this record is expected.
 		s.cfg.Logger.Info("job deleted mid-run, run record dropped", "job", job.ID)

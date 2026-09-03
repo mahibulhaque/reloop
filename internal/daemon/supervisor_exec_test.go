@@ -38,7 +38,7 @@ func TestInstallWritesUnitAndReportsSupervised(t *testing.T) {
 	stubSupervisorTools(t, stubOK)
 	dataDir := t.TempDir()
 
-	installed, err := Install("/bin/repeat", dataDir)
+	installed, err := Install("/bin/reloop", dataDir)
 	if err != nil {
 		t.Fatalf("Install: %v", err)
 	}
@@ -66,7 +66,7 @@ func TestInstallNoOpWhileDaemonRunsWithCurrentUnit(t *testing.T) {
 	stubSupervisorTools(t, stubOK)
 	dataDir := t.TempDir()
 
-	if _, err := Install("/bin/repeat", dataDir); err != nil {
+	if _, err := Install("/bin/reloop", dataDir); err != nil {
 		t.Fatalf("first Install: %v", err)
 	}
 	// Hold the run lock so the probe sees a live daemon.
@@ -76,7 +76,7 @@ func TestInstallNoOpWhileDaemonRunsWithCurrentUnit(t *testing.T) {
 	}
 	t.Cleanup(release)
 
-	installed, err := Install("/bin/repeat", dataDir)
+	installed, err := Install("/bin/reloop", dataDir)
 	if err != nil {
 		t.Fatalf("second Install: %v", err)
 	}
@@ -90,10 +90,10 @@ func TestInstallReappliesWhenDaemonDown(t *testing.T) {
 	stubSupervisorTools(t, stubOK)
 	dataDir := t.TempDir()
 
-	if _, err := Install("/bin/repeat", dataDir); err != nil {
+	if _, err := Install("/bin/reloop", dataDir); err != nil {
 		t.Fatalf("first Install: %v", err)
 	}
-	installed, err := Install("/bin/repeat", dataDir)
+	installed, err := Install("/bin/reloop", dataDir)
 	if err != nil {
 		t.Fatalf("second Install: %v", err)
 	}
@@ -103,7 +103,7 @@ func TestInstallReappliesWhenDaemonDown(t *testing.T) {
 }
 
 func TestInstallRejectsControlCharacters(t *testing.T) {
-	if _, err := Install("/bin/repeat\n", t.TempDir()); err == nil {
+	if _, err := Install("/bin/reloop\n", t.TempDir()); err == nil {
 		t.Errorf("Install with a newline in the binary path: want error, got nil")
 	}
 }
@@ -116,7 +116,7 @@ func TestInstallMkdirDataDirFails(t *testing.T) {
 		t.Fatalf("write file: %v", err)
 	}
 
-	if _, err := Install("/bin/repeat", file); err == nil {
+	if _, err := Install("/bin/reloop", file); err == nil {
 		t.Errorf("Install with a file as data dir: want error, got nil")
 	}
 }
@@ -125,7 +125,7 @@ func TestUninstallRemovesUnit(t *testing.T) {
 	fakeUnitHome(t)
 	stubSupervisorTools(t, stubOK)
 
-	if _, err := Install("/bin/repeat", t.TempDir()); err != nil {
+	if _, err := Install("/bin/reloop", t.TempDir()); err != nil {
 		t.Fatalf("Install: %v", err)
 	}
 	removed, err := Uninstall()
@@ -150,7 +150,7 @@ func TestUninstallRemoveFails(t *testing.T) {
 	}
 	fakeUnitHome(t)
 	stubSupervisorTools(t, stubOK)
-	if _, err := Install("/bin/repeat", t.TempDir()); err != nil {
+	if _, err := Install("/bin/reloop", t.TempDir()); err != nil {
 		t.Fatalf("Install: %v", err)
 	}
 	p, err := unitPath()
@@ -188,7 +188,7 @@ func TestRunUnitFailureCarriesOutput(t *testing.T) {
 
 func TestInstallLaunchdReplacesExistingUnit(t *testing.T) {
 	stubSupervisorTools(t, stubOK)
-	path := filepath.Join(t.TempDir(), "dev.repeat.repeatd.plist")
+	path := filepath.Join(t.TempDir(), "dev.reloop.reloopd.plist")
 	if err := os.WriteFile(path, []byte("old"), 0o644); err != nil {
 		t.Fatalf("write old plist: %v", err)
 	}
@@ -207,7 +207,7 @@ func TestInstallLaunchdReplacesExistingUnit(t *testing.T) {
 
 func TestInstallSystemdWritesAndStarts(t *testing.T) {
 	stubSupervisorTools(t, stubOK)
-	path := filepath.Join(t.TempDir(), "repeatd.service")
+	path := filepath.Join(t.TempDir(), "reloopd.service")
 
 	if err := installSystemd(path, "unit-content"); err != nil {
 		t.Fatalf("installSystemd: %v", err)
@@ -223,7 +223,7 @@ func TestInstallSystemdWritesAndStarts(t *testing.T) {
 
 func TestInstallSystemdReloadFailure(t *testing.T) {
 	stubSupervisorTools(t, "#!/bin/sh\nexit 1\n")
-	path := filepath.Join(t.TempDir(), "repeatd.service")
+	path := filepath.Join(t.TempDir(), "reloopd.service")
 
 	if err := installSystemd(path, "unit"); err == nil {
 		t.Errorf("installSystemd with failing systemctl: want error, got nil")
@@ -233,7 +233,7 @@ func TestInstallSystemdReloadFailure(t *testing.T) {
 func TestInstallSystemdEnableFailure(t *testing.T) {
 	// daemon-reload succeeds, enable fails.
 	stubSupervisorTools(t, "#!/bin/sh\ncase \"$2\" in enable) exit 1 ;; esac\nexit 0\n")
-	path := filepath.Join(t.TempDir(), "repeatd.service")
+	path := filepath.Join(t.TempDir(), "reloopd.service")
 
 	if err := installSystemd(path, "unit"); err == nil {
 		t.Errorf("installSystemd with failing enable: want error, got nil")

@@ -10,7 +10,7 @@ import (
 	"time"
 	"unicode"
 
-	"github.com/mahibulhaque/repeat/internal/repeat"
+	"github.com/mahibulhaque/reloop/internal/reloop"
 )
 
 // writeJSON serialises v with a trailing newline. Errors go to
@@ -35,7 +35,7 @@ const nameColMax = 32
 //   - ID and Kind stay narrow.
 //   - STATUS is enabled, disabled, or done.
 //   - RESULT is ok, fail, or skipped_overlap.
-func writeJobsTable(w io.Writer, jobs []repeat.Job) {
+func writeJobsTable(w io.Writer, jobs []reloop.Job) {
 	tw := tabwriter.NewWriter(w, 0, 0, 2, ' ', 0)
 	fmt.Fprintln(tw, "ID\tKIND\tNAME\tSCHEDULE\tSTATUS\tLAST RUN\tRESULT")
 	for _, j := range jobs {
@@ -79,7 +79,7 @@ func truncate(s string, max int) string {
 	return string(r[:max-3]) + "..."
 }
 
-func writeJobDetail(w io.Writer, j repeat.Job) {
+func writeJobDetail(w io.Writer, j reloop.Job) {
 	fmt.Fprintf(w, "id:           %s\n", j.ID)
 	fmt.Fprintf(w, "kind:         %s\n", j.Kind)
 	fmt.Fprintf(w, "name:         %s\n", sanitize(j.Name))
@@ -93,7 +93,7 @@ func writeJobDetail(w io.Writer, j repeat.Job) {
 	fmt.Fprintf(w, "updated:      %s\n", fmtLocal(j.UpdatedAt))
 }
 
-func writeStatus(w io.Writer, s repeat.Status) {
+func writeStatus(w io.Writer, s reloop.Status) {
 	supervised := "no"
 	if s.Daemon.Supervised {
 		supervised = "yes"
@@ -132,11 +132,11 @@ func writeStatus(w io.Writer, s repeat.Status) {
 		s.Jobs.OneshotInFlight)
 }
 
-func scheduleSummary(j repeat.Job) string {
+func scheduleSummary(j reloop.Job) string {
 	switch j.Kind {
-	case repeat.KindCron:
+	case reloop.KindCron:
 		return j.Cron
-	case repeat.KindOneshot:
+	case reloop.KindOneshot:
 		return "at " + fmtLocal(j.FireAt)
 	}
 	return ""

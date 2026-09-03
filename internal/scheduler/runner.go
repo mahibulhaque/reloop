@@ -12,14 +12,14 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/mahibulhaque/repeat/internal/repeat"
+	"github.com/mahibulhaque/reloop/internal/reloop"
 )
 
 // runner executes a single job. Decoupling exec from the scheduler
 // lets tests substitute a fake that records invocations without
 // forking processes.
 type runner interface {
-	Run(ctx context.Context, job repeat.Job, out io.Writer) (exitCode int, err error)
+	Run(ctx context.Context, job reloop.Job, out io.Writer) (exitCode int, err error)
 }
 
 // execRunner is the production [runner].
@@ -34,7 +34,7 @@ type execRunner struct {
 }
 
 // Run executes job and writes merged stdout and stderr to out.
-func (e execRunner) Run(ctx context.Context, job repeat.Job, out io.Writer) (int, error) {
+func (e execRunner) Run(ctx context.Context, job reloop.Job, out io.Writer) (int, error) {
 	if len(job.Command) == 0 {
 		return -1, errors.New("scheduler: empty command")
 	}
@@ -74,18 +74,18 @@ func (e execRunner) Run(ctx context.Context, job repeat.Job, out io.Writer) (int
 	}
 	// The process never started.
 	//
-	// Persist the reason so `repeat logs` can show it.
-	if _, writeErr := fmt.Fprintf(out, "repeat: failed to start: %v\n", err); writeErr != nil {
+	// Persist the reason so `reloop logs` can show it.
+	if _, writeErr := fmt.Fprintf(out, "reloop: failed to start: %v\n", err); writeErr != nil {
 		return -1, errors.Join(err, writeErr)
 	}
 	return -1, err
 }
 
 // buildCmd wires the process for a job. A job with an env snapshot
-// resolves argv[0] against the snapshot PATH from `repeat add` time,
+// resolves argv[0] against the snapshot PATH from `reloop add` time,
 // never against the daemon's, so a snapshot miss fails instead of
 // falling back.
-func buildCmd(ctx context.Context, job repeat.Job) *exec.Cmd {
+func buildCmd(ctx context.Context, job reloop.Job) *exec.Cmd {
 	name := job.Command[0]
 	if len(job.Env) == 0 {
 		return exec.CommandContext(ctx, name, job.Command[1:]...)
@@ -133,7 +133,7 @@ func envPath(env []string) string {
 //
 // Needed because:
 //   - The daemon's PATH can come from launchd or systemd.
-//   - Jobs should use the PATH snapshotted at `repeat add` time.
+//   - Jobs should use the PATH snapshotted at `reloop add` time.
 func lookPathIn(name, path string) (string, error) {
 	if strings.ContainsRune(name, os.PathSeparator) {
 		// Already a path.

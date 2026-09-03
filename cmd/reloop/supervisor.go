@@ -7,7 +7,7 @@ import (
 	"os/exec"
 	"time"
 
-	"github.com/mahibulhaque/repeat/internal/daemon"
+	"github.com/mahibulhaque/reloop/internal/daemon"
 	"github.com/spf13/cobra"
 )
 
@@ -15,14 +15,14 @@ func newInstallCmd() *cobra.Command {
 	return &cobra.Command{
 		Use:   "install",
 		Short: "Register the daemon with launchd (macOS) or systemd --user (Linux).",
-		Long: `Write the platform's supervisor unit and bootstrap it so the repeat daemon
+		Long: `Write the platform's supervisor unit and bootstrap it so the reloop daemon
 starts on login and respawns on crash. Idempotent and self-healing:
 re-running rewrites and reloads the unit when the binary path, data
 dir, or unit format changed (e.g. after a brew upgrade moved the
 binary), and is a no-op otherwise. A --data-dir flag given here is
 baked into the unit so the supervised daemon serves the same data
 dir as the CLI.`,
-		Example: "  repeat install\n  repeat install   # re-run after upgrading repeat to refresh the unit",
+		Example: "  reloop install\n  reloop install   # re-run after upgrading reloop to refresh the unit",
 		Args:    cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, _ []string) error {
 			dir, err := dataDir()
@@ -44,7 +44,7 @@ dir as the CLI.`,
 			if errors.Is(err, exec.ErrNotFound) {
 				// No launchctl/systemctl on this box. A raw exec error
 				// would leave the user without the working path.
-				return fmt.Errorf("%w: this system has no launchd/systemd, run the daemon directly (see 'repeat daemon --help')", err)
+				return fmt.Errorf("%w: this system has no launchd/systemd, run the daemon directly (see 'reloop daemon --help')", err)
 			}
 			if err != nil {
 				return err
@@ -63,10 +63,10 @@ func newUninstallCmd() *cobra.Command {
 	return &cobra.Command{
 		Use:   "uninstall",
 		Short: "Remove the launchd/systemd supervisor unit.",
-		Long: `Unload and delete the supervisor unit written by 'repeat install'. Leaves
-the database and binary intact; for a full purge use 'repeat seppuku'.
-Idempotent: a second 'repeat uninstall' reports nothing to remove.`,
-		Example: "  repeat uninstall",
+		Long: `Unload and delete the supervisor unit written by 'reloop install'. Leaves
+the database and binary intact; for a full purge use 'reloop seppuku'.
+Idempotent: a second 'reloop uninstall' reports nothing to remove.`,
+		Example: "  reloop uninstall",
 		Args:    cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, _ []string) error {
 			removed, err := daemon.Uninstall()
@@ -97,7 +97,7 @@ func newStopCmd() *cobra.Command {
 single-instance lock. Escalates to SIGKILL after 15 seconds. Returns
 success either way (idempotent), printing a note when no daemon was
 running to begin with.`,
-		Example: "  repeat stop",
+		Example: "  reloop stop",
 		Args:    cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, _ []string) error {
 			dir, err := dataDir()

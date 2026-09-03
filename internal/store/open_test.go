@@ -10,7 +10,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/mahibulhaque/repeat/internal/repeat"
+	"github.com/mahibulhaque/reloop/internal/reloop"
 )
 
 func TestOpenInMemory(t *testing.T) {
@@ -23,7 +23,7 @@ func TestOpenInMemory(t *testing.T) {
 	if got := st.DBPath(); got != ":memory:" {
 		t.Errorf("DBPath = %q, want %q", got, ":memory:")
 	}
-	if _, err := st.AddJob(t.Context(), repeat.JobSpec{
+	if _, err := st.AddJob(t.Context(), reloop.JobSpec{
 		Name: "mem", Command: []string{"true"}, Cron: "@hourly",
 	}, time.Now()); err != nil {
 		t.Errorf("AddJob on in-memory store: %v", err)

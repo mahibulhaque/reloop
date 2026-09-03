@@ -11,8 +11,8 @@ func newShowCmd() *cobra.Command {
 		Long: `Show full detail for the job identified by its 5-char ID or its
 exact name. With --json, emit the job as a single JSON object suitable
 for programmatic use.`,
-		Example: `  repeat show 7K3px
-  repeat show backup --json | jq .cron`,
+		Example: `  reloop show 7K3px
+  reloop show backup --json | jq .cron`,
 		Args: jobArg,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return withService(cmd, func(s *service) error {

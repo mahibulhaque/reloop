@@ -13,11 +13,11 @@ func newDebugCmd() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "debug",
 		Short: "Inspection and debug helpers.",
-		Long: `Subcommands for inspecting repeat's internals. Not part of the stable
+		Long: `Subcommands for inspecting reloop's internals. Not part of the stable
 user-facing API. Tools and messages here can change without notice.`,
-		Example: "  repeat debug db                # open a sqlite shell against repeat's database",
+		Example: "  reloop debug db                # open a sqlite shell against reloop's database",
 		// Without an explicit RunE, Cobra silently prints parent help and
-		// exits 0 for unknown subcommands like `repeat debug bogus`. We want
+		// exits 0 for unknown subcommands like `reloop debug bogus`. We want
 		// that to surface as a usage error (exit 2) instead.
 		RunE: func(cmd *cobra.Command, args []string) error {
 			if len(args) == 0 {
@@ -33,11 +33,11 @@ user-facing API. Tools and messages here can change without notice.`,
 func newDebugDBCmd() *cobra.Command {
 	return &cobra.Command{
 		Use:   "db",
-		Short: "Open the SQLite shell against repeat's database.",
-		Long: `Open sqlite3 on repeat's database file. A starter query prints the 10
+		Short: "Open the SQLite shell against reloop's database.",
+		Long: `Open sqlite3 on reloop's database file. A starter query prints the 10
 most recently created jobs. After that it is a regular interactive
 sqlite3 session. Requires sqlite3 on PATH.`,
-		Example: "  repeat debug db",
+		Example: "  reloop debug db",
 		Args:    cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, _ []string) error {
 			sqlite, err := exec.LookPath("sqlite3")
@@ -48,7 +48,7 @@ sqlite3 session. Requires sqlite3 on PATH.`,
 			if err != nil {
 				return err
 			}
-			dbPath := filepath.Join(dir, "repeat.db")
+			dbPath := filepath.Join(dir, "reloop.db")
 			if _, err := os.Stat(dbPath); err != nil {
 				return fmt.Errorf("database not found at %s: %w", dbPath, err)
 			}

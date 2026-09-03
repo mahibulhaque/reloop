@@ -14,10 +14,10 @@ import (
 )
 
 func TestMain(m *testing.M) {
-	// Wire repeat as a testscript-callable command. The scripts drive it
+	// Wire reloop as a testscript-callable command. The scripts drive it
 	// like a real shell session.
 	testscript.Main(m, map[string]func(){
-		"repeat":  func() { os.Exit(run()) },
+		"reloop":  func() { os.Exit(run()) },
 		"timeout": func() { os.Exit(runTimeoutMain()) },
 		"waitfor": func() { os.Exit(runWaitForMain()) },
 	})
@@ -88,7 +88,7 @@ func TestScripts(t *testing.T) {
 		Dir: "testdata/script",
 		Setup: func(env *testscript.Env) error {
 			// Each script gets its own HOME / XDG so the data directory lives
-			// entirely inside $WORK and never touches the user's real repeat state.
+			// entirely inside $WORK and never touches the user's real reloop state.
 			env.Setenv("HOME", env.WorkDir)
 			env.Setenv("XDG_DATA_HOME", env.WorkDir+"/xdg")
 			env.Setenv("XDG_CONFIG_HOME", env.WorkDir+"/xdg-config")
