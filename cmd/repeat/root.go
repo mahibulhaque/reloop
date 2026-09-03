@@ -70,6 +70,7 @@ machine-readable output on stdout. Errors and warnings go to stderr.`,
 		newInstallCmd(),
 		newUninstallCmd(),
 		newStopCmd(),
+		newLogsCmd(),
 		newDebugCmd(),
 	)
 	tagUsageErrors(root)
