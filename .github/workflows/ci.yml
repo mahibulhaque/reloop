@@ -1,0 +1,157 @@
+name: ci
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    name: test (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest]
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-go@v7
+        with:
+          go-version: stable
+          cache: true
+
+      - name: go vet
+        run: go vet ./...
+
+      - name: build
+        run: go build ./...
+
+      # coverpkg merges coverage across packages, so store and daemon
+      # code exercised through the CLI script tests counts too.
+      - name: test
+        run: go test -race -count=1 -coverpkg=./... -coverprofile=cover.out ./...
+
+      # Report-only: makes untested branches visible in the log without
+      # gating merges on a number.
+      - name: coverage
+        run: go tool cover -func=cover.out | tail -n 1
+
+      # The badge job reuses this profile instead of re-running the
+      # suite.
+      - name: upload coverage profile
+        if: matrix.os == 'ubuntu-latest' && github.event_name == 'push' && github.ref == 'refs/heads/main'
+        uses: actions/upload-artifact@v7
+        with:
+          name: coverage-profile
+          path: cover.out
+
+      # Rebuild for the *other* OS too so a Linux-only or macOS-only file
+      # tag breakage shows up immediately, even when only one runner is hot.
+      - name: cross-compile (linux from macos / macos from linux)
+        run: |
+          if [ "${{ matrix.os }}" = "macos-latest" ]; then
+            GOOS=linux go build ./...
+          else
+            GOOS=darwin go build ./...
+          fi
+
+  lint:
+    name: lint
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-go@v7
+        with:
+          go-version: stable
+
+      - uses: golangci/golangci-lint-action@v9
+        with:
+          # Must be a release that understands the go.mod Go version:
+          # older linters cannot read a newer stdlib's export data.
+          version: v2.13.1
+          args: --timeout=5m
+
+  # The curl-pipe-sh path a Linux user actually takes, against the
+  # latest published release. Catches a broken asset name, checksum
+  # file, or install.sh regression.
+  install-script:
+    name: install script
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: run install.sh against the latest release
+        run: |
+          mkdir -p "$RUNNER_TEMP/prefix/bin"
+          RELOOP_PREFIX="$RUNNER_TEMP/prefix" sh install.sh
+          "$RUNNER_TEMP/prefix/bin/reloop" --version
+
+  # Publishes the coverage number as a shields.io endpoint JSON on a
+  # badges branch after every push to main. Self-contained: no coverage
+  # service, no account token, just GITHUB_TOKEN pushing one file.
+  coverage-badge:
+    name: coverage badge
+    needs: test
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-go@v7
+        with:
+          go-version: stable
+          cache: true
+
+      - uses: actions/download-artifact@v8
+        with:
+          name: coverage-profile
+
+      - name: compute coverage
+        run: echo "PCT=$(go tool cover -func=cover.out | tail -n 1 | awk '{print $3}')" >> "$GITHUB_ENV"
+
+      - name: publish badge json
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          NUM=${PCT%\%}
+          COLOR=$(awk -v p="$NUM" 'BEGIN { print (p >= 80) ? "brightgreen" : (p >= 70) ? "green" : (p >= 50) ? "yellow" : "red" }')
+          mkdir badge && cd badge
+          printf '{"schemaVersion": 1, "label": "coverage", "message": "%s", "color": "%s"}\n' "$PCT" "$COLOR" > coverage.json
+          git init -q -b badges
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add coverage.json
+          git commit -qm "chore: update coverage badge"
+          git push -q --force "https://x-access-token:${GITHUB_TOKEN}@github.com/${GITHUB_REPOSITORY}.git" badges
+
+  goreleaser-check:
+    name: goreleaser check
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+
+      - uses: actions/setup-go@v7
+        with:
+          go-version: stable
+          cache: true
+
+      - uses: goreleaser/goreleaser-action@v7
+        with:
+          distribution: goreleaser
+          version: "~> v2"
+          args: check
+
+      - uses: goreleaser/goreleaser-action@v7
+        with:
+          distribution: goreleaser
+          version: "~> v2"
+          args: build --snapshot --clean --single-target
