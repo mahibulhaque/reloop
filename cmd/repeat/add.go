@@ -15,10 +15,10 @@ import (
 
 func newAddCmd() *cobra.Command {
 	var (
-		cronExpr string
-		atExpr   string
-		name     string
-		jsonOut  bool
+		cronExpression string
+		atExpression   string
+		name           string
+		jsonOut        bool
 	)
 	cmd := &cobra.Command{
 		Use:     "add [--cron EXPR | --at TIME] [--name NAME] -- COMMAND [ARG...]",
@@ -126,7 +126,7 @@ year has four digits in any timezone.`,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			// Validate all input before openService: a rejected
 			// invocation must not create the data dir as a side effect.
-			if (cronExpr == "") == (atExpr == "") {
+			if (cronExpression == "") == (atExpression == "") {
 				return usageErrf("provide exactly one of --cron or --at")
 			}
 			if cmd.ArgsLenAtDash() < 0 {
@@ -152,10 +152,10 @@ year has four digits in any timezone.`,
 			// One clock reading for parsing --at and validating it, so
 			// a fire time can never expire between the two.
 			now := time.Now()
-			if cronExpr != "" {
-				spec.Cron = cronExpr
+			if cronExpression != "" {
+				spec.Cron = cronExpression
 			} else {
-				fireAt, err := repeat.ParseAt(atExpr, now)
+				fireAt, err := repeat.ParseAt(atExpression, now)
 				if err != nil {
 					return err
 				}
@@ -177,8 +177,8 @@ year has four digits in any timezone.`,
 			})
 		},
 	}
-	cmd.Flags().StringVar(&cronExpr, "cron", "", "cron expression (mutually exclusive with --at)")
-	cmd.Flags().StringVar(&atExpr, "at", "", "fire time for a one-shot job; wall-clock (mutually exclusive with --cron)")
+	cmd.Flags().StringVar(&cronExpression, "cron", "", "cron expression (mutually exclusive with --at)")
+	cmd.Flags().StringVar(&atExpression, "at", "", "fire time for a one-shot job; wall-clock (mutually exclusive with --cron)")
 	cmd.Flags().StringVar(&name, "name", "", "human label (defaults to the command)")
 	cmd.Flags().BoolVar(&jsonOut, "json", false, "emit the created job as JSON on stdout")
 	return cmd

@@ -1,0 +1,79 @@
+# Adverse 'add' inputs all surface specific exit codes. Stable codes
+# are the contract LLMs and shell pipelines rely on.
+
+# No args at all → cobra's arg-count check (exit 2).
+! exec repeat add
+stderr 'Usage error.*requires at least'
+
+# No schedule flag (but command provided) → exit 2 (usage).
+! exec repeat add -- echo hi
+stderr 'provide exactly one of --cron or --at'
+
+# Both schedule flags → exit 2.
+! exec repeat add --cron '@hourly' --at '+1h' -- echo hi
+stderr 'provide exactly one of --cron or --at'
+
+# Missing '--' → exit 2.
+! exec repeat add --cron '@hourly' echo hi
+stderr 'Usage error.*place the command'
+
+# Usage errors must not create the data dir as a side effect.
+! exists $XDG_DATA_HOME/repeat/repeat.db
+
+# Garbage cron expression → exit 5 (precondition).
+! exec repeat add --cron 'garbage' -- echo hi
+stderr 'invalid cron'
+
+# Empty cron reads as an unset flag → usage error, exit 2.
+! exec repeat add --cron '' -- echo hi
+
+# Past one-shot → exit 5.
+! exec repeat add --at '2020-01-01T00:00:00Z' -- echo hi
+stderr 'not in the future'
+
+# Nonsense at value → exit 5.
+! exec repeat add --at 'yesterday' -- echo hi
+stderr 'invalid time'
+
+# Negative day offset → exit 5.
+! exec repeat add --at '+-1h' -- echo hi
+
+# Empty command after '--' → exit 2 (usage).
+! exec repeat add --cron '@hourly' -- ''
+stderr 'empty command'
+
+# Whitespace-only shell line → exit 2.
+! exec repeat add --cron '@hourly' -- '   '
+stderr 'empty command'
+
+# Syntactically valid cron that matches no real day → exit 5.
+! exec repeat add --cron '0 0 31 2 *' -- echo hi
+stderr 'matches no future time'
+
+# Day offsets past the RFC3339 ceiling (year 9999) → exit 5.
+! exec repeat add --at '+999999999d' -- echo hi
+stderr 'maximum schedulable time'
+
+# 2^57+1 days: AddDate normalization would wrap this back inside the
+# valid window; it must still be rejected → exit 5.
+! exec repeat add --at '+144115188075855873d' -- echo hi
+stderr 'maximum schedulable time'
+
+# Sub-second @every would be silently rounded up to 1s → exit 5.
+! exec repeat add --cron '@every 500ms' -- echo hi
+stderr 'at least 1s'
+
+# Sub-second --at offsets lose the race against the store's clock → exit 5.
+! exec repeat add --at '+500ms' -- echo hi
+stderr 'at least 1s'
+
+# Whitespace-only name → exit 5.
+! exec repeat add --cron '@hourly' --name '   ' -- echo hi
+stderr 'name required'
+
+# An overlong explicit --name is rejected, but a long command without
+# --name gets a truncated default instead.
+! exec repeat add --cron '@hourly' --name 'nnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnn' -- echo hi
+stderr 'name exceeds'
+exec repeat add --cron '@hourly' -- 'echo nnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnn'
+stdout 'added job'
