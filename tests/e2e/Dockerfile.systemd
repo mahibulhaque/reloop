@@ -1,0 +1,28 @@
+# Runs the e2e harness against a real systemd --user manager, the
+# path 'reloop install' takes on Linux. The container boots /sbin/init as
+# PID 1; systemd.sh waits for it, enables lingering for the test user,
+# and runs the harness with RELOOP_E2E_SUPERVISOR=1. Driven by:
+#
+#   bash tests/e2e/systemd.sh
+#
+# The plain Dockerfile covers the no-init path (Alpine/WSL-style);
+# this one covers the supervised path. Both drive the same run.sh.
+
+FROM golang:1.27 AS build
+WORKDIR /src
+COPY go.mod go.sum ./
+RUN go mod download
+COPY . .
+# modernc.org/sqlite is pure Go, so the binary is fully static.
+RUN CGO_ENABLED=0 go build -o /out/reloop ./cmd/reloop
+
+FROM debian:bookworm
+# dbus-user-session supplies the per-user bus systemctl --user talks
+# to; procps supplies pkill for the harness's crash-orphan cleanup.
+RUN apt-get update && apt-get install -y --no-install-recommends \
+	systemd systemd-sysv dbus-user-session procps \
+	&& rm -rf /var/lib/apt/lists/*
+RUN useradd -m tester
+COPY --from=build /out/reloop /usr/local/bin/reloop
+COPY tests/e2e/run.sh /usr/local/share/reloop/e2e.sh
+CMD ["/sbin/init"]
