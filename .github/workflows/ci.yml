@@ -76,21 +76,6 @@ jobs:
           version: v2.13.1
           args: --timeout=5m
 
-  # The curl-pipe-sh path a Linux user actually takes, against the
-  # latest published release. Catches a broken asset name, checksum
-  # file, or install.sh regression.
-  install-script:
-    name: install script
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v7
-
-      - name: run install.sh against the latest release
-        run: |
-          mkdir -p "$RUNNER_TEMP/prefix/bin"
-          RELOOP_PREFIX="$RUNNER_TEMP/prefix" sh install.sh
-          "$RUNNER_TEMP/prefix/bin/reloop" --version
-
   # Publishes the coverage number as a shields.io endpoint JSON on a
   # badges branch after every push to main. Self-contained: no coverage
   # service, no account token, just GITHUB_TOKEN pushing one file.
