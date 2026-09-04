@@ -5,6 +5,8 @@ A cron and one-shot job scheduler.
 [![ci](https://img.shields.io/github/actions/workflow/status/mahibulhaque/reloop/ci.yml?branch=main&label=ci&style=for-the-badge)](https://github.com/mahibulhaque/reloop/actions/workflows/ci.yml)
 [![coverage](https://img.shields.io/endpoint?url=https%3A%2F%2Fraw.githubusercontent.com%2Fmahibulhaque%2Freloop%2Fbadges%2Fcoverage.json&style=for-the-badge)](https://github.com/mahibulhaque/reloop/actions/workflows/ci.yml)
 
+![Made with VHS](https://vhs.charm.sh/vhs-4rhkK8KPtaAHLK33fsLTdY.gif)
+
 It does two things:
 
 - recurring (cron-style) jobs
